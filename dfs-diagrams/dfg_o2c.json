@@ -1,0 +1,520 @@
+{
+  "edges": [
+    {
+      "id": "renamed->merged",
+      "label": "Edge renamed-merged",
+      "source": "renamed",
+      "target": "merged"
+    },
+    {
+      "id": "assigned->assigned",
+      "label": "Edge assigned-assigned",
+      "source": "assigned",
+      "target": "assigned"
+    },
+    {
+      "id": "commented->merged",
+      "label": "Edge commented-merged",
+      "source": "commented",
+      "target": "merged"
+    },
+    {
+      "id": "milestoned->added_to_project",
+      "label": "Edge milestoned-added_to_project",
+      "source": "milestoned",
+      "target": "added_to_project"
+    },
+    {
+      "id": "milestoned->assigned",
+      "label": "Edge milestoned-assigned",
+      "source": "milestoned",
+      "target": "assigned"
+    },
+    {
+      "id": "assigned->cross-referenced",
+      "label": "Edge assigned-cross-referenced",
+      "source": "assigned",
+      "target": "cross-referenced"
+    },
+    {
+      "id": "created->milestoned",
+      "label": "Edge created-milestoned",
+      "source": "created",
+      "target": "milestoned"
+    },
+    {
+      "id": "head_ref_deleted->head_ref_restored",
+      "label": "Edge head_ref_deleted-head_ref_restored",
+      "source": "head_ref_deleted",
+      "target": "head_ref_restored"
+    },
+    {
+      "id": "commented->moved_columns_in_project",
+      "label": "Edge commented-moved_columns_in_project",
+      "source": "commented",
+      "target": "moved_columns_in_project"
+    },
+    {
+      "id": "added_to_project->renamed",
+      "label": "Edge added_to_project-renamed",
+      "source": "added_to_project",
+      "target": "renamed"
+    },
+    {
+      "id": "added_to_project->created",
+      "label": "Edge added_to_project-created",
+      "source": "added_to_project",
+      "target": "created"
+    },
+    {
+      "id": "base_ref_changed->merged",
+      "label": "Edge base_ref_changed-merged",
+      "source": "base_ref_changed",
+      "target": "merged"
+    },
+    {
+      "id": "created->added_to_project",
+      "label": "Edge created-added_to_project",
+      "source": "created",
+      "target": "added_to_project"
+    },
+    {
+      "id": "base_ref_changed->commented",
+      "label": "Edge base_ref_changed-commented",
+      "source": "base_ref_changed",
+      "target": "commented"
+    },
+    {
+      "id": "added_to_project->commented",
+      "label": "Edge added_to_project-commented",
+      "source": "added_to_project",
+      "target": "commented"
+    },
+    {
+      "id": "created->subscribed",
+      "label": "Edge created-subscribed",
+      "source": "created",
+      "target": "subscribed"
+    },
+    {
+      "id": "commented->base_ref_changed",
+      "label": "Edge commented-base_ref_changed",
+      "source": "commented",
+      "target": "base_ref_changed"
+    },
+    {
+      "id": "renamed->commented",
+      "label": "Edge renamed-commented",
+      "source": "renamed",
+      "target": "commented"
+    },
+    {
+      "id": "closed->merged",
+      "label": "Edge closed-merged",
+      "source": "closed",
+      "target": "merged"
+    },
+    {
+      "id": "unlabeled->commented",
+      "label": "Edge unlabeled-commented",
+      "source": "unlabeled",
+      "target": "commented"
+    },
+    {
+      "id": "merged->closed",
+      "label": "Edge merged-closed",
+      "source": "merged",
+      "target": "closed"
+    },
+    {
+      "id": "mentioned->base_ref_changed",
+      "label": "Edge mentioned-base_ref_changed",
+      "source": "mentioned",
+      "target": "base_ref_changed"
+    },
+    {
+      "id": "commented->unassigned",
+      "label": "Edge commented-unassigned",
+      "source": "commented",
+      "target": "unassigned"
+    },
+    {
+      "id": "closed->moved_columns_in_project",
+      "label": "Edge closed-moved_columns_in_project",
+      "source": "closed",
+      "target": "moved_columns_in_project"
+    },
+    {
+      "id": "added_to_project->assigned",
+      "label": "Edge added_to_project-assigned",
+      "source": "added_to_project",
+      "target": "assigned"
+    },
+    {
+      "id": "created->renamed",
+      "label": "Edge created-renamed",
+      "source": "created",
+      "target": "renamed"
+    },
+    {
+      "id": "created->head_ref_deleted",
+      "label": "Edge created-head_ref_deleted",
+      "source": "created",
+      "target": "head_ref_deleted"
+    },
+    {
+      "id": "labeled->added_to_project",
+      "label": "Edge labeled-added_to_project",
+      "source": "labeled",
+      "target": "added_to_project"
+    },
+    {
+      "id": "renamed->renamed",
+      "label": "Edge renamed-renamed",
+      "source": "renamed",
+      "target": "renamed"
+    },
+    {
+      "id": "assigned->mentioned",
+      "label": "Edge assigned-mentioned",
+      "source": "assigned",
+      "target": "mentioned"
+    },
+    {
+      "id": "merged->referenced",
+      "label": "Edge merged-referenced",
+      "source": "merged",
+      "target": "referenced"
+    },
+    {
+      "id": "labeled->assigned",
+      "label": "Edge labeled-assigned",
+      "source": "labeled",
+      "target": "assigned"
+    },
+    {
+      "id": "unlabeled->assigned",
+      "label": "Edge unlabeled-assigned",
+      "source": "unlabeled",
+      "target": "assigned"
+    },
+    {
+      "id": "milestoned->labeled",
+      "label": "Edge milestoned-labeled",
+      "source": "milestoned",
+      "target": "labeled"
+    },
+    {
+      "id": "assigned->milestoned",
+      "label": "Edge assigned-milestoned",
+      "source": "assigned",
+      "target": "milestoned"
+    },
+    {
+      "id": "head_ref_restored->created",
+      "label": "Edge head_ref_restored-created",
+      "source": "head_ref_restored",
+      "target": "created"
+    },
+    {
+      "id": "created->base_ref_changed",
+      "label": "Edge created-base_ref_changed",
+      "source": "created",
+      "target": "base_ref_changed"
+    },
+    {
+      "id": "created->merged",
+      "label": "Edge created-merged",
+      "source": "created",
+      "target": "merged"
+    },
+    {
+      "id": "added_to_project->milestoned",
+      "label": "Edge added_to_project-milestoned",
+      "source": "added_to_project",
+      "target": "milestoned"
+    },
+    {
+      "id": "closed->head_ref_deleted",
+      "label": "Edge closed-head_ref_deleted",
+      "source": "closed",
+      "target": "head_ref_deleted"
+    },
+    {
+      "id": "created->closed",
+      "label": "Edge created-closed",
+      "source": "created",
+      "target": "closed"
+    },
+    {
+      "id": "head_ref_deleted->closed",
+      "label": "Edge head_ref_deleted-closed",
+      "source": "head_ref_deleted",
+      "target": "closed"
+    },
+    {
+      "id": "milestoned->commented",
+      "label": "Edge milestoned-commented",
+      "source": "milestoned",
+      "target": "commented"
+    },
+    {
+      "id": "renamed->closed",
+      "label": "Edge renamed-closed",
+      "source": "renamed",
+      "target": "closed"
+    },
+    {
+      "id": "assigned->created",
+      "label": "Edge assigned-created",
+      "source": "assigned",
+      "target": "created"
+    },
+    {
+      "id": "assigned->commented",
+      "label": "Edge assigned-commented",
+      "source": "assigned",
+      "target": "commented"
+    },
+    {
+      "id": "created->commented",
+      "label": "Edge created-commented",
+      "source": "created",
+      "target": "commented"
+    },
+    {
+      "id": "labeled->created",
+      "label": "Edge labeled-created",
+      "source": "labeled",
+      "target": "created"
+    },
+    {
+      "id": "created->referenced",
+      "label": "Edge created-referenced",
+      "source": "created",
+      "target": "referenced"
+    },
+    {
+      "id": "created->mentioned",
+      "label": "Edge created-mentioned",
+      "source": "created",
+      "target": "mentioned"
+    },
+    {
+      "id": "closed->renamed",
+      "label": "Edge closed-renamed",
+      "source": "closed",
+      "target": "renamed"
+    },
+    {
+      "id": "renamed->milestoned",
+      "label": "Edge renamed-milestoned",
+      "source": "renamed",
+      "target": "milestoned"
+    },
+    {
+      "id": "milestoned->moved_columns_in_project",
+      "label": "Edge milestoned-moved_columns_in_project",
+      "source": "milestoned",
+      "target": "moved_columns_in_project"
+    },
+    {
+      "id": "created->cross-referenced",
+      "label": "Edge created-cross-referenced",
+      "source": "created",
+      "target": "cross-referenced"
+    },
+    {
+      "id": "merged->head_ref_deleted",
+      "label": "Edge merged-head_ref_deleted",
+      "source": "merged",
+      "target": "head_ref_deleted"
+    },
+    {
+      "id": "created->assigned",
+      "label": "Edge created-assigned",
+      "source": "created",
+      "target": "assigned"
+    },
+    {
+      "id": "assigned->labeled",
+      "label": "Edge assigned-labeled",
+      "source": "assigned",
+      "target": "labeled"
+    },
+    {
+      "id": "milestoned->renamed",
+      "label": "Edge milestoned-renamed",
+      "source": "milestoned",
+      "target": "renamed"
+    },
+    {
+      "id": "commented->renamed",
+      "label": "Edge commented-renamed",
+      "source": "commented",
+      "target": "renamed"
+    },
+    {
+      "id": "created->labeled",
+      "label": "Edge created-labeled",
+      "source": "created",
+      "target": "labeled"
+    },
+    {
+      "id": "milestoned->closed",
+      "label": "Edge milestoned-closed",
+      "source": "milestoned",
+      "target": "closed"
+    },
+    {
+      "id": "milestoned->created",
+      "label": "Edge milestoned-created",
+      "source": "milestoned",
+      "target": "created"
+    },
+    {
+      "id": "assigned->added_to_project",
+      "label": "Edge assigned-added_to_project",
+      "source": "assigned",
+      "target": "added_to_project"
+    },
+    {
+      "id": "labeled->unlabeled",
+      "label": "Edge labeled-unlabeled",
+      "source": "labeled",
+      "target": "unlabeled"
+    },
+    {
+      "id": "labeled->milestoned",
+      "label": "Edge labeled-milestoned",
+      "source": "labeled",
+      "target": "milestoned"
+    },
+    {
+      "id": "subscribed->created",
+      "label": "Edge subscribed-created",
+      "source": "subscribed",
+      "target": "created"
+    },
+    {
+      "id": "added_to_project->moved_columns_in_project",
+      "label": "Edge added_to_project-moved_columns_in_project",
+      "source": "added_to_project",
+      "target": "moved_columns_in_project"
+    },
+    {
+      "id": "base_ref_changed->created",
+      "label": "Edge base_ref_changed-created",
+      "source": "base_ref_changed",
+      "target": "created"
+    },
+    {
+      "id": "moved_columns_in_project->closed",
+      "label": "Edge moved_columns_in_project-closed",
+      "source": "moved_columns_in_project",
+      "target": "closed"
+    },
+    {
+      "id": "commented->assigned",
+      "label": "Edge commented-assigned",
+      "source": "commented",
+      "target": "assigned"
+    },
+    {
+      "id": "unassigned->closed",
+      "label": "Edge unassigned-closed",
+      "source": "unassigned",
+      "target": "closed"
+    },
+    {
+      "id": "milestoned->unassigned",
+      "label": "Edge milestoned-unassigned",
+      "source": "milestoned",
+      "target": "unassigned"
+    },
+    {
+      "id": "moved_columns_in_project->commented",
+      "label": "Edge moved_columns_in_project-commented",
+      "source": "moved_columns_in_project",
+      "target": "commented"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "renamed",
+      "label": "renamed"
+    },
+    {
+      "id": "merged",
+      "label": "merged"
+    },
+    {
+      "id": "assigned",
+      "label": "assigned"
+    },
+    {
+      "id": "commented",
+      "label": "commented"
+    },
+    {
+      "id": "milestoned",
+      "label": "milestoned"
+    },
+    {
+      "id": "added_to_project",
+      "label": "added_to_project"
+    },
+    {
+      "id": "cross-referenced",
+      "label": "cross-referenced"
+    },
+    {
+      "id": "created",
+      "label": "created"
+    },
+    {
+      "id": "head_ref_deleted",
+      "label": "head_ref_deleted"
+    },
+    {
+      "id": "head_ref_restored",
+      "label": "head_ref_restored"
+    },
+    {
+      "id": "moved_columns_in_project",
+      "label": "moved_columns_in_project"
+    },
+    {
+      "id": "base_ref_changed",
+      "label": "base_ref_changed"
+    },
+    {
+      "id": "subscribed",
+      "label": "subscribed"
+    },
+    {
+      "id": "closed",
+      "label": "closed"
+    },
+    {
+      "id": "unlabeled",
+      "label": "unlabeled"
+    },
+    {
+      "id": "mentioned",
+      "label": "mentioned"
+    },
+    {
+      "id": "unassigned",
+      "label": "unassigned"
+    },
+    {
+      "id": "labeled",
+      "label": "labeled"
+    },
+    {
+      "id": "referenced",
+      "label": "referenced"
+    }
+  ]
+}

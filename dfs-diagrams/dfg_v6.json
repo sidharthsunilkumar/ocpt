@@ -1,0 +1,178 @@
+{
+  "edges": [
+    {
+      "id": "add label 1->send out",
+      "label": "Edge add label 1-send out",
+      "source": "add label 1",
+      "target": "send out"
+    },
+    {
+      "id": "request->charge",
+      "label": "Edge request-charge",
+      "source": "request",
+      "target": "charge"
+    },
+    {
+      "id": "confirm status->complete",
+      "label": "Edge confirm status-complete",
+      "source": "confirm status",
+      "target": "complete"
+    },
+    {
+      "id": "confirm pack->complete",
+      "label": "Edge confirm pack-complete",
+      "source": "confirm pack",
+      "target": "complete"
+    },
+    {
+      "id": "status failed->redo check status",
+      "label": "Edge status failed-redo check status",
+      "source": "status failed",
+      "target": "redo check status"
+    },
+    {
+      "id": "charge->fragile pack",
+      "label": "Edge charge-fragile pack",
+      "source": "charge",
+      "target": "fragile pack"
+    },
+    {
+      "id": "normal pack->confirm pack",
+      "label": "Edge normal pack-confirm pack",
+      "source": "normal pack",
+      "target": "confirm pack"
+    },
+    {
+      "id": "charge->normal pack",
+      "label": "Edge charge-normal pack",
+      "source": "charge",
+      "target": "normal pack"
+    },
+    {
+      "id": "request->fragile pack",
+      "label": "Edge request-fragile pack",
+      "source": "request",
+      "target": "fragile pack"
+    },
+    {
+      "id": "check status->confirm status",
+      "label": "Edge check status-confirm status",
+      "source": "check status",
+      "target": "confirm status"
+    },
+    {
+      "id": "confirm pack->add label 1",
+      "label": "Edge confirm pack-add label 1",
+      "source": "confirm pack",
+      "target": "add label 1"
+    },
+    {
+      "id": "add label 1->add label 2",
+      "label": "Edge add label 1-add label 2",
+      "source": "add label 1",
+      "target": "add label 2"
+    },
+    {
+      "id": "add label 2->add label 1",
+      "label": "Edge add label 2-add label 1",
+      "source": "add label 2",
+      "target": "add label 1"
+    },
+    {
+      "id": "add label 2->send out",
+      "label": "Edge add label 2-send out",
+      "source": "add label 2",
+      "target": "send out"
+    },
+    {
+      "id": "send out->check status",
+      "label": "Edge send out-check status",
+      "source": "send out",
+      "target": "check status"
+    },
+    {
+      "id": "confirm status->status failed",
+      "label": "Edge confirm status-status failed",
+      "source": "confirm status",
+      "target": "status failed"
+    },
+    {
+      "id": "fragile pack->confirm pack",
+      "label": "Edge fragile pack-confirm pack",
+      "source": "fragile pack",
+      "target": "confirm pack"
+    },
+    {
+      "id": "request->normal pack",
+      "label": "Edge request-normal pack",
+      "source": "request",
+      "target": "normal pack"
+    },
+    {
+      "id": "redo check status->check status",
+      "label": "Edge redo check status-check status",
+      "source": "redo check status",
+      "target": "check status"
+    },
+    {
+      "id": "confirm pack->add label 2",
+      "label": "Edge confirm pack-add label 2",
+      "source": "confirm pack",
+      "target": "add label 2"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "add label 1",
+      "label": "add label 1"
+    },
+    {
+      "id": "send out",
+      "label": "send out"
+    },
+    {
+      "id": "request",
+      "label": "request"
+    },
+    {
+      "id": "charge",
+      "label": "charge"
+    },
+    {
+      "id": "confirm status",
+      "label": "confirm status"
+    },
+    {
+      "id": "complete",
+      "label": "complete"
+    },
+    {
+      "id": "confirm pack",
+      "label": "confirm pack"
+    },
+    {
+      "id": "status failed",
+      "label": "status failed"
+    },
+    {
+      "id": "redo check status",
+      "label": "redo check status"
+    },
+    {
+      "id": "fragile pack",
+      "label": "fragile pack"
+    },
+    {
+      "id": "normal pack",
+      "label": "normal pack"
+    },
+    {
+      "id": "check status",
+      "label": "check status"
+    },
+    {
+      "id": "add label 2",
+      "label": "add label 2"
+    }
+  ]
+}

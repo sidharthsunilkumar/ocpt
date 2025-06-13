@@ -1,0 +1,4 @@
+Time for process tree----------------------
+
+OG - 3004.93s
+With the 4 checking_cuts fns and info commented out - 346.87s

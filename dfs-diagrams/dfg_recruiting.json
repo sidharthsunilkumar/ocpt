@@ -1,0 +1,292 @@
+{
+  "edges": [
+    {
+      "id": "make job offer->offer accepted and hired",
+      "label": "Edge make job offer-offer accepted and hired",
+      "source": "make job offer",
+      "target": "offer accepted and hired"
+    },
+    {
+      "id": "close vacancy for new applications->assign vacancy",
+      "label": "Edge close vacancy for new applications-assign vacancy",
+      "source": "close vacancy for new applications",
+      "target": "assign vacancy"
+    },
+    {
+      "id": "assign vacancy->offer accepted and hired",
+      "label": "Edge assign vacancy-offer accepted and hired",
+      "source": "assign vacancy",
+      "target": "offer accepted and hired"
+    },
+    {
+      "id": "open vacancy->close vacancy for new applications",
+      "label": "Edge open vacancy-close vacancy for new applications",
+      "source": "open vacancy",
+      "target": "close vacancy for new applications"
+    },
+    {
+      "id": "offer accepted and hired->invite for interview",
+      "label": "Edge offer accepted and hired-invite for interview",
+      "source": "offer accepted and hired",
+      "target": "invite for interview"
+    },
+    {
+      "id": "job offer declined->close vacancy (no hire)",
+      "label": "Edge job offer declined-close vacancy (no hire)",
+      "source": "job offer declined",
+      "target": "close vacancy (no hire)"
+    },
+    {
+      "id": "check references->consult manager",
+      "label": "Edge check references-consult manager",
+      "source": "check references",
+      "target": "consult manager"
+    },
+    {
+      "id": "conduct interview->send rejection",
+      "label": "Edge conduct interview-send rejection",
+      "source": "conduct interview",
+      "target": "send rejection"
+    },
+    {
+      "id": "close vacancy for new applications->invite for interview",
+      "label": "Edge close vacancy for new applications-invite for interview",
+      "source": "close vacancy for new applications",
+      "target": "invite for interview"
+    },
+    {
+      "id": "check references->send rejection",
+      "label": "Edge check references-send rejection",
+      "source": "check references",
+      "target": "send rejection"
+    },
+    {
+      "id": "close vacancy for new applications->close vacancy (no hire)",
+      "label": "Edge close vacancy for new applications-close vacancy (no hire)",
+      "source": "close vacancy for new applications",
+      "target": "close vacancy (no hire)"
+    },
+    {
+      "id": "submit application->assign recruiter",
+      "label": "Edge submit application-assign recruiter",
+      "source": "submit application",
+      "target": "assign recruiter"
+    },
+    {
+      "id": "assign vacancy->close vacancy for new applications",
+      "label": "Edge assign vacancy-close vacancy for new applications",
+      "source": "assign vacancy",
+      "target": "close vacancy for new applications"
+    },
+    {
+      "id": "invite for interview->conduct interview",
+      "label": "Edge invite for interview-conduct interview",
+      "source": "invite for interview",
+      "target": "conduct interview"
+    },
+    {
+      "id": "assign recruiter->assign vacancy",
+      "label": "Edge assign recruiter-assign vacancy",
+      "source": "assign recruiter",
+      "target": "assign vacancy"
+    },
+    {
+      "id": "check references->invite for interview",
+      "label": "Edge check references-invite for interview",
+      "source": "check references",
+      "target": "invite for interview"
+    },
+    {
+      "id": "consult manager->send rejection",
+      "label": "Edge consult manager-send rejection",
+      "source": "consult manager",
+      "target": "send rejection"
+    },
+    {
+      "id": "conduct interview->close vacancy (no hire)",
+      "label": "Edge conduct interview-close vacancy (no hire)",
+      "source": "conduct interview",
+      "target": "close vacancy (no hire)"
+    },
+    {
+      "id": "make job offer->job offer declined",
+      "label": "Edge make job offer-job offer declined",
+      "source": "make job offer",
+      "target": "job offer declined"
+    },
+    {
+      "id": "conduct interview->make job offer",
+      "label": "Edge conduct interview-make job offer",
+      "source": "conduct interview",
+      "target": "make job offer"
+    },
+    {
+      "id": "assign recruiter->first screening",
+      "label": "Edge assign recruiter-first screening",
+      "source": "assign recruiter",
+      "target": "first screening"
+    },
+    {
+      "id": "offer accepted and hired->conduct interview",
+      "label": "Edge offer accepted and hired-conduct interview",
+      "source": "offer accepted and hired",
+      "target": "conduct interview"
+    },
+    {
+      "id": "first screening->consult manager",
+      "label": "Edge first screening-consult manager",
+      "source": "first screening",
+      "target": "consult manager"
+    },
+    {
+      "id": "assign vacancy->first screening",
+      "label": "Edge assign vacancy-first screening",
+      "source": "assign vacancy",
+      "target": "first screening"
+    },
+    {
+      "id": "consult manager->check references",
+      "label": "Edge consult manager-check references",
+      "source": "consult manager",
+      "target": "check references"
+    },
+    {
+      "id": "assign vacancy->close vacancy (no hire)",
+      "label": "Edge assign vacancy-close vacancy (no hire)",
+      "source": "assign vacancy",
+      "target": "close vacancy (no hire)"
+    },
+    {
+      "id": "change manager->close vacancy (no hire)",
+      "label": "Edge change manager-close vacancy (no hire)",
+      "source": "change manager",
+      "target": "close vacancy (no hire)"
+    },
+    {
+      "id": "offer accepted and hired->assign vacancy",
+      "label": "Edge offer accepted and hired-assign vacancy",
+      "source": "offer accepted and hired",
+      "target": "assign vacancy"
+    },
+    {
+      "id": "invite for interview->offer accepted and hired",
+      "label": "Edge invite for interview-offer accepted and hired",
+      "source": "invite for interview",
+      "target": "offer accepted and hired"
+    },
+    {
+      "id": "submit application->close vacancy for new applications",
+      "label": "Edge submit application-close vacancy for new applications",
+      "source": "submit application",
+      "target": "close vacancy for new applications"
+    },
+    {
+      "id": "conduct interview->offer accepted and hired",
+      "label": "Edge conduct interview-offer accepted and hired",
+      "source": "conduct interview",
+      "target": "offer accepted and hired"
+    },
+    {
+      "id": "first screening->check references",
+      "label": "Edge first screening-check references",
+      "source": "first screening",
+      "target": "check references"
+    },
+    {
+      "id": "close vacancy for new applications->change manager",
+      "label": "Edge close vacancy for new applications-change manager",
+      "source": "close vacancy for new applications",
+      "target": "change manager"
+    },
+    {
+      "id": "first screening->send rejection",
+      "label": "Edge first screening-send rejection",
+      "source": "first screening",
+      "target": "send rejection"
+    },
+    {
+      "id": "open vacancy->assign vacancy",
+      "label": "Edge open vacancy-assign vacancy",
+      "source": "open vacancy",
+      "target": "assign vacancy"
+    },
+    {
+      "id": "consult manager->invite for interview",
+      "label": "Edge consult manager-invite for interview",
+      "source": "consult manager",
+      "target": "invite for interview"
+    },
+    {
+      "id": "open vacancy->submit application",
+      "label": "Edge open vacancy-submit application",
+      "source": "open vacancy",
+      "target": "submit application"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "make job offer",
+      "label": "make job offer"
+    },
+    {
+      "id": "offer accepted and hired",
+      "label": "offer accepted and hired"
+    },
+    {
+      "id": "close vacancy for new applications",
+      "label": "close vacancy for new applications"
+    },
+    {
+      "id": "assign vacancy",
+      "label": "assign vacancy"
+    },
+    {
+      "id": "open vacancy",
+      "label": "open vacancy"
+    },
+    {
+      "id": "invite for interview",
+      "label": "invite for interview"
+    },
+    {
+      "id": "job offer declined",
+      "label": "job offer declined"
+    },
+    {
+      "id": "close vacancy (no hire)",
+      "label": "close vacancy (no hire)"
+    },
+    {
+      "id": "check references",
+      "label": "check references"
+    },
+    {
+      "id": "consult manager",
+      "label": "consult manager"
+    },
+    {
+      "id": "conduct interview",
+      "label": "conduct interview"
+    },
+    {
+      "id": "send rejection",
+      "label": "send rejection"
+    },
+    {
+      "id": "submit application",
+      "label": "submit application"
+    },
+    {
+      "id": "assign recruiter",
+      "label": "assign recruiter"
+    },
+    {
+      "id": "first screening",
+      "label": "first screening"
+    },
+    {
+      "id": "change manager",
+      "label": "change manager"
+    }
+  ]
+}
