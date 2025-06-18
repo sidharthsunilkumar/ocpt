@@ -1,76 +1,608 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use crate::types::{TreeNode, ProcessForest};
 use itertools::Itertools;
 use log::info;
+use crate::cost_to_cut::to_be_non_reachable;
+
+/// Step 1: Tarjan's Algorithm to find SCCs
+pub fn strongly_connected_components(
+    dfg: &HashMap<(String, String), usize>,
+    all_activities: &HashSet<String>,
+) -> Vec<Vec<String>> {
+    // Step 1: Build adjacency list
+    let mut graph: HashMap<String, Vec<String>> = HashMap::new();
+    for ((from, to), _) in dfg.iter() {
+        graph.entry(from.clone()).or_default().push(to.clone());
+    }
+    for activity in all_activities {
+        graph.entry(activity.clone()).or_default();
+    }
+
+    // Tarjan’s setup
+    let mut index = 0;
+    let mut indices = HashMap::new();
+    let mut lowlink = HashMap::new();
+    let mut stack = Vec::new();
+    let mut on_stack = HashSet::new();
+    let mut sccs = Vec::new();
+
+    fn strongconnect(
+        node: &String,
+        graph: &HashMap<String, Vec<String>>,
+        index: &mut usize,
+        indices: &mut HashMap<String, usize>,
+        lowlink: &mut HashMap<String, usize>,
+        stack: &mut Vec<String>,
+        on_stack: &mut HashSet<String>,
+        sccs: &mut Vec<Vec<String>>,
+    ) {
+        indices.insert(node.clone(), *index);
+        lowlink.insert(node.clone(), *index);
+        *index += 1;
+        stack.push(node.clone());
+        on_stack.insert(node.clone());
+
+        if let Some(neighbors) = graph.get(node) {
+            for neighbor in neighbors {
+                if !indices.contains_key(neighbor) {
+                    strongconnect(
+                        neighbor,
+                        graph,
+                        index,
+                        indices,
+                        lowlink,
+                        stack,
+                        on_stack,
+                        sccs,
+                    );
+                    let low_n = lowlink[neighbor];
+                    let low_v = lowlink[node];
+                    lowlink.insert(node.clone(), low_v.min(low_n));
+                } else if on_stack.contains(neighbor) {
+                    let idx_n = indices[neighbor];
+                    let low_v = lowlink[node];
+                    lowlink.insert(node.clone(), low_v.min(idx_n));
+                }
+            }
+        }
+
+        if indices[node] == lowlink[node] {
+            let mut scc = Vec::new();
+            while let Some(top) = stack.pop() {
+                on_stack.remove(&top);
+                scc.push(top.clone());
+                if &top == node {
+                    break;
+                }
+            }
+            sccs.push(scc);
+        }
+    }
+
+    // Run Tarjan's on all nodes
+    for node in all_activities {
+        if !indices.contains_key(node) {
+            strongconnect(
+                node,
+                &graph,
+                &mut index,
+                &mut indices,
+                &mut lowlink,
+                &mut stack,
+                &mut on_stack,
+                &mut sccs,
+            );
+        }
+    }
+
+    sccs
+}
+
+/// Step 2: Build SCC DAG
+pub fn build_scc_dag(
+    sccs: &Vec<Vec<String>>,
+    dfg: &HashMap<(String, String), usize>,
+) -> (HashMap<usize, HashSet<usize>>, HashMap<String, usize>) {
+    let mut node_to_scc = HashMap::new();
+    for (i, scc) in sccs.iter().enumerate() {
+        for node in scc {
+            node_to_scc.insert(node.clone(), i);
+        }
+    }
+
+    let mut dag: HashMap<usize, HashSet<usize>> = HashMap::new();
+    for ((from, to), _) in dfg.iter() {
+        let from_scc = node_to_scc[from];
+        let to_scc = node_to_scc[to];
+        if from_scc != to_scc {
+            dag.entry(from_scc).or_default().insert(to_scc);
+        }
+    }
+
+    (dag, node_to_scc)
+}
+
+/// Step 3: Extract set1 and set2 SCCs and their activity sets
+pub fn partition_scc_sets(
+    dag: &HashMap<usize, HashSet<usize>>,
+    sccs: &Vec<Vec<String>>,
+) {
+    let mut set1: HashSet<usize> = HashSet::new();
+    let mut set2: HashSet<usize> = HashSet::new();
+
+    for (&from, targets) in dag.iter() {
+        set1.insert(from);
+        for &to in targets {
+            set1.remove(&to); // ensure it's not in set1
+            set2.insert(to);
+        }
+    }
+
+    println!("Set1 (SCC ids): {:?}", set1);
+    println!("Set2 (SCC ids): {:?}", set2);
+
+    let mut act_set1 = HashSet::new();
+    let mut act_set2 = HashSet::new();
+
+    for &scc_id in set1.iter() {
+        for act in &sccs[scc_id] {
+            act_set1.insert(act.clone());
+        }
+    }
+    for &scc_id in set2.iter() {
+        for act in &sccs[scc_id] {
+            act_set2.insert(act.clone());
+        }
+    }
+
+    println!("Activity Set 1: {:?}", act_set1);
+    println!("Activity Set 2: {:?}", act_set2);
+}
+
+
+// done----------
+
+pub fn print_strongly_connected_components(
+    dfg: &HashMap<(String, String), usize>,
+    all_activities: &HashSet<String>,
+) {
+    // Step 1: Build adjacency list
+    let mut graph: HashMap<String, Vec<String>> = HashMap::new();
+    for (key, _) in dfg.iter() {
+        let (from, to) = key;
+        graph.entry(from.clone()).or_default().push(to.clone());
+    }
+    for activity in all_activities {
+        graph.entry(activity.clone()).or_default();
+    }
+
+    // Step 2: Tarjan's Algorithm setup
+    let mut index = 0;
+    let mut indices: HashMap<String, usize> = HashMap::new();
+    let mut lowlink: HashMap<String, usize> = HashMap::new();
+    let mut stack: Vec<String> = Vec::new();
+    let mut on_stack: HashSet<String> = HashSet::new();
+    let mut sccs: Vec<Vec<String>> = Vec::new();
+
+    // Step 3: Tarjan's Recursive DFS
+    fn strongconnect(
+        node: &String,
+        graph: &HashMap<String, Vec<String>>,
+        index: &mut usize,
+        indices: &mut HashMap<String, usize>,
+        lowlink: &mut HashMap<String, usize>,
+        stack: &mut Vec<String>,
+        on_stack: &mut HashSet<String>,
+        sccs: &mut Vec<Vec<String>>,
+    ) {
+        indices.insert(node.clone(), *index);
+        lowlink.insert(node.clone(), *index);
+        *index += 1;
+        stack.push(node.clone());
+        on_stack.insert(node.clone());
+
+        if let Some(neighbors) = graph.get(node) {
+            for neighbor in neighbors {
+                if !indices.contains_key(neighbor) {
+                    strongconnect(
+                        neighbor,
+                        graph,
+                        index,
+                        indices,
+                        lowlink,
+                        stack,
+                        on_stack,
+                        sccs,
+                    );
+                    let neighbor_low = lowlink.get(neighbor).copied().unwrap();
+                    let node_low = lowlink.get(node).copied().unwrap();
+                    lowlink.insert(node.clone(), node_low.min(neighbor_low));
+                } else if on_stack.contains(neighbor) {
+                    let neighbor_index = indices.get(neighbor).copied().unwrap();
+                    let node_low = lowlink.get(node).copied().unwrap();
+                    lowlink.insert(node.clone(), node_low.min(neighbor_index));
+                }
+            }
+        }
+
+        if indices.get(node) == lowlink.get(node) {
+            let mut scc = Vec::new();
+            while let Some(top) = stack.pop() {
+                on_stack.remove(&top);
+                scc.push(top.clone());
+                if &top == node {
+                    break;
+                }
+            }
+            sccs.push(scc);
+        }
+    }
+
+    // Step 4: Run Tarjan's for all nodes
+    for node in all_activities {
+        if !indices.contains_key(node) {
+            strongconnect(
+                node,
+                &graph,
+                &mut index,
+                &mut indices,
+                &mut lowlink,
+                &mut stack,
+                &mut on_stack,
+                &mut sccs,
+            );
+        }
+    }
+
+    // Step 5: Print SCCs
+    println!("Strongly Connected Components:");
+    for (i, scc) in sccs.iter().enumerate() {
+        println!("Component {}: {:?}", i + 1, scc);
+    }
+}
+
+/// Main entry function
+pub fn find_sequence_cut(
+    dfg: &HashMap<(String, String), usize>,
+    all_activities: &HashSet<String>,
+) {
+    if all_activities.len() <= 1 {
+        return;
+    }
+
+    // Build adjacency list and reverse graph
+    let mut graph: HashMap<String, Vec<String>> = HashMap::new();
+    let mut reverse_graph: HashMap<String, Vec<String>> = HashMap::new();
+    for ((from, to), _) in dfg {
+        graph.entry(from.clone()).or_default().push(to.clone());
+        reverse_graph.entry(to.clone()).or_default().push(from.clone());
+    }
+
+    // Compute SCCs
+    let sccs = compute_sccs(all_activities, &graph, &reverse_graph);
+
+    // Try each SCC as Set1 (prefix)
+    for (idx, candidate_scc) in sccs.iter().enumerate() {
+        let set1 = candidate_scc.clone();
+        let mut reachable = HashSet::new();
+
+        for node in &set1 {
+            dfs(node, &graph, &mut reachable);
+        }
+
+        let set2: HashSet<String> = reachable
+            .difference(&set1)
+            .cloned()
+            .collect();
+
+        if set1.is_empty() || set2.is_empty() {
+            continue;
+        }
+
+        // Condition 1: No activity in set2 can reach set1
+        let mut reverse_reach = HashSet::new();
+        for node in &set2 {
+            dfs(node, &graph, &mut reverse_reach);
+        }
+        if reverse_reach.intersection(&set1).count() > 0 {
+            continue;
+        }
+
+        // Condition 2: All activities in set1 can reach every activity in set2
+        let mut valid = true;
+        for target in &set2 {
+            let mut reachable_from_any = false;
+            for source in &set1 {
+                let mut visited = HashSet::new();
+                dfs(source, &graph, &mut visited);
+                if visited.contains(target) {
+                    reachable_from_any = true;
+                    break;
+                }
+            }
+            if !reachable_from_any {
+                valid = false;
+                break;
+            }
+        }
+
+        if valid {
+            println!("Sequence cut found with {:?} and {:?}", set1, set2);
+
+            let subgraph1 = build_subgraph(dfg, &set1);
+            let subgraph2 = build_subgraph(dfg, &set2);
+            find_sequence_cut(&subgraph1, &set1);
+            find_sequence_cut(&subgraph2, &set2);
+            return;
+        }
+    }
+
+    println!("No valid sequence cut found for {:?}", all_activities);
+}
+
+/// Build subgraph restricted to given activity set
+fn build_subgraph(
+    dfg: &HashMap<(String, String), usize>,
+    activities: &HashSet<String>,
+) -> HashMap<(String, String), usize> {
+    dfg.iter()
+        .filter_map(|((from, to), weight)| {
+            if activities.contains(from) && activities.contains(to) {
+                Some(((from.clone(), to.clone()), *weight))
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+/// DFS from a node in a graph
+fn dfs(node: &String, graph: &HashMap<String, Vec<String>>, visited: &mut HashSet<String>) {
+    let mut stack = vec![node.clone()];
+    while let Some(curr) = stack.pop() {
+        if visited.insert(curr.clone()) {
+            if let Some(neighbors) = graph.get(&curr) {
+                for neighbor in neighbors {
+                    stack.push(neighbor.clone());
+                }
+            }
+        }
+    }
+}
+
+/// Compute strongly connected components using Kosaraju's algorithm
+fn compute_sccs(
+    all_activities: &HashSet<String>,
+    graph: &HashMap<String, Vec<String>>,
+    reverse_graph: &HashMap<String, Vec<String>>,
+) -> Vec<HashSet<String>> {
+    let mut visited = HashSet::new();
+    let mut finish_stack = Vec::new();
+
+    for node in all_activities {
+        if !visited.contains(node) {
+            dfs_postorder(node, graph, &mut visited, &mut finish_stack);
+        }
+    }
+
+    visited.clear();
+    let mut sccs = Vec::new();
+
+    while let Some(node) = finish_stack.pop() {
+        if !visited.contains(&node) {
+            let mut component = HashSet::new();
+            dfs_collect(&node, reverse_graph, &mut visited, &mut component);
+            sccs.push(component);
+        }
+    }
+
+    sccs
+}
+
+/// DFS post-order for Kosaraju step 1
+fn dfs_postorder(
+    node: &String,
+    graph: &HashMap<String, Vec<String>>,
+    visited: &mut HashSet<String>,
+    stack: &mut Vec<String>,
+) {
+    visited.insert(node.clone());
+    if let Some(neighbors) = graph.get(node) {
+        for neighbor in neighbors {
+            if !visited.contains(neighbor) {
+                dfs_postorder(neighbor, graph, visited, stack);
+            }
+        }
+    }
+    stack.push(node.clone());
+}
+
+/// DFS collect for Kosaraju step 2
+fn dfs_collect(
+    node: &String,
+    graph: &HashMap<String, Vec<String>>,
+    visited: &mut HashSet<String>,
+    component: &mut HashSet<String>,
+) {
+    visited.insert(node.clone());
+    component.insert(node.clone());
+    if let Some(neighbors) = graph.get(node) {
+        for neighbor in neighbors {
+            if !visited.contains(neighbor) {
+                dfs_collect(neighbor, graph, visited, component);
+            }
+        }
+    }
+}
+
+
 
 pub fn find_cuts_start(
     dfg: &HashMap<(String, String), usize>,
     all_activities: &HashSet<String>,
 ) {
-    // Initialize sets with each activity having an empty HashSet
-    let mut seq_sets: HashMap<String, HashSet<String>> = HashMap::new();
-    let mut para_sets: HashMap<String, HashSet<String>> = HashMap::new();
-    let mut excl_sets: HashMap<String, HashSet<String>> = HashMap::new();
-    let mut redo_sets: HashMap<String, HashSet<String>> = HashMap::new();
 
-    for activity in all_activities {
-        seq_sets.insert(activity.clone(), HashSet::new());
-        para_sets.insert(activity.clone(), HashSet::new());
-        excl_sets.insert(activity.clone(), HashSet::new());
-        redo_sets.insert(activity.clone(), HashSet::new());
+    // find_sequence_cut(&dfg, &all_activities);
+
+    // print_strongly_connected_components(&dfg, &all_activities);
+
+    let sccs = strongly_connected_components(&dfg, &all_activities);
+    println!("SCCs:");
+    for (i, comp) in sccs.iter().enumerate() {
+        println!("  SCC {}: {:?}", i, comp);
     }
 
-    let activities_vec: Vec<String> = all_activities.iter().cloned().collect();
-    let n = activities_vec.len();
-
-    for i in 0..n {
-        for j in (i + 1)..n {
-            let activity1 = &activities_vec[i];
-            let activity2 = &activities_vec[j];
-
-            let act1_act2 = is_reachable(dfg, activity1, activity2);
-            let act2_act1 = is_reachable(dfg, activity2, activity1);
-
-            match (act1_act2, act2_act1) {
-                (true, false) => {
-                    if let Some(set) = seq_sets.get_mut(activity1) {
-                        set.insert(activity2.clone());
-                    }
-                }
-                (false, true) => {
-                    if let Some(set) = seq_sets.get_mut(activity2) {
-                        set.insert(activity1.clone());
-                    }
-                }
-                (true, true) => {
-                    if let Some(set) = para_sets.get_mut(activity1) {
-                        set.insert(activity2.clone());
-                    }
-                    if let Some(set) = para_sets.get_mut(activity2) {
-                        set.insert(activity1.clone());
-                    }
-                }
-                (false, false) => {
-                    if let Some(set) = excl_sets.get_mut(activity1) {
-                        set.insert(activity2.clone());
-                    }
-                    if let Some(set) = excl_sets.get_mut(activity2) {
-                        set.insert(activity1.clone());
-                    }
-                }
-            }
+    let (dag, _) = build_scc_dag(&sccs, &dfg);
+    println!("SCC DAG:");
+    for (from, tos) in &dag {
+        for to in tos {
+            println!("  SCC {} -> SCC {}", from, to);
         }
     }
 
-    // You can return or print the maps here if needed
-    // For now, just to show it's valid:
-    println!("Sequential sets: {:?}", seq_sets);
-    // println!("Parallel sets: {:?}", para_sets);
-    // println!("Exclusive sets: {:?}", excl_sets);
+    // Step 3: Create set1 and set2
+    let mut set1: HashSet<usize> = HashSet::new();
+    let mut set2: HashSet<usize> = HashSet::new();
+    for (from, tos) in &dag {
+        for to in tos {
+            set1.insert(*from);
+            set2.insert(*to);
+        }
+    }
 
+    // Step 4: Remove overlaps from set1
+    let intersection: HashSet<_> = set1.intersection(&set2).cloned().collect();
+    for i in intersection {
+        set1.remove(&i);
+    }
+
+    println!("\nSCC index sets:");
+    println!("  Set1 (sources): {:?}", set1);
+    println!("  Set2 (targets): {:?}", set2);
+
+    // Step 5: Map SCCs to activity sets
+    let mut act_set1 = HashSet::new();
+    let mut act_set2 = HashSet::new();
+
+    for i in &set1 {
+        for act in &sccs[*i] {
+            act_set1.insert(act.clone());
+        }
+    }
+
+    for i in &set2 {
+        for act in &sccs[*i] {
+            act_set2.insert(act.clone());
+        }
+    }
+
+    println!("\nActivity sets:");
+    println!("  act_set1: {:?}", act_set1);
+    println!("  act_set2: {:?}", act_set2);
+
+
+    // // Initialize sets with each activity having an empty HashSet
+    // let mut seq_sets: HashMap<String, HashSet<String>> = HashMap::new();
+    // let mut para_sets: HashMap<String, HashSet<String>> = HashMap::new();
+    // let mut excl_sets: HashMap<String, HashSet<String>> = HashMap::new();
+    // let mut redo_sets: HashMap<String, HashSet<String>> = HashMap::new();
+
+    // for activity in all_activities {
+    //     seq_sets.insert(activity.clone(), HashSet::new());
+    //     para_sets.insert(activity.clone(), HashSet::new());
+    //     excl_sets.insert(activity.clone(), HashSet::new());
+    //     redo_sets.insert(activity.clone(), HashSet::new());
+    // }
+
+    // let activities_vec: Vec<String> = all_activities.iter().cloned().collect();
+    // let n = activities_vec.len();
+
+    // for i in 0..n {
+    //     for j in (i + 1)..n {
+    //         let activity1 = &activities_vec[i];
+    //         let activity2 = &activities_vec[j];
+
+    //         let act1_act2 = is_reachable(dfg, activity1, activity2);
+    //         let act2_act1 = is_reachable(dfg, activity2, activity1);
+
+    //         match (act1_act2, act2_act1) {
+    //             (true, false) => {
+    //                 if let Some(set) = seq_sets.get_mut(activity1) {
+    //                     set.insert(activity2.clone());
+    //                 }
+    //             }
+    //             (false, true) => {
+    //                 if let Some(set) = seq_sets.get_mut(activity2) {
+    //                     set.insert(activity1.clone());
+    //                 }
+    //             }
+    //             (true, true) => {
+    //                 if let Some(set) = para_sets.get_mut(activity1) {
+    //                     set.insert(activity2.clone());
+    //                 }
+    //                 if let Some(set) = para_sets.get_mut(activity2) {
+    //                     set.insert(activity1.clone());
+    //                 }
+    //             }
+    //             (false, false) => {
+    //                 if let Some(set) = excl_sets.get_mut(activity1) {
+    //                     set.insert(activity2.clone());
+    //                 }
+    //                 if let Some(set) = excl_sets.get_mut(activity2) {
+    //                     set.insert(activity1.clone());
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
+
+    // // You can return or print the maps here if needed
+    // // For now, just to show it's valid:
+    // info!("Sequential sets: {:?}", seq_sets);
+    // // info!("Parallel sets: {:?}", para_sets);
+    // // info!("Exclusive sets: {:?}", excl_sets);
+
+    //  // Sequential cut detection logic
+    // let mut set1: HashSet<String> = HashSet::new();
+    // let mut set2: HashSet<String> = HashSet::new();
+    // let mut unknown: HashSet<String> = HashSet::new();
+
+    // for act in all_activities {
+    //     if !set1.contains(act) && !set2.contains(act) {
+    //         if let Some(targets) = seq_sets.get(act) {
+    //             if !targets.is_empty() {
+    //                 set1.insert(act.clone());
+    //                 for t in targets {
+    //                     set2.insert(t.clone());
+    //                 }
+    //             } else {
+    //                 unknown.insert(act.clone());
+    //             }
+    //         }
+    //     }
+    // }
+    // info!("Set1: {:?}", set1);
+    // info!("Set2: {:?}", set2);
+    // info!("Unknown: {:?}", unknown);
+    // if set1.len() + set2.len() == all_activities.len() {
+    //     info!("Seq cut found: {:?} (->) {:?}", set1, set2);
+    //     find_cuts_start(&dfg, &set1);
+    //     find_cuts_start(&dfg, &set2);
+    // } else {
+    //     // info!("Size of all activities: {}, set1: {}, set2: {}", all_activities.len(), set1.len(), set2.len());
+    //     info!("No sequential cut found");
+    // }
+
+}
+
+fn find_best_cut(
+    seq_sets: &HashMap<String, HashSet<String>>,
+    all_activities: &HashSet<String>,
+){
     // Sequential cut detection logic
     let mut set1: HashSet<String> = HashSet::new();
     let mut set2: HashSet<String> = HashSet::new();
+    let mut unknown: HashSet<String> = HashSet::new();
 
     for act in all_activities {
         if !set1.contains(act) && !set2.contains(act) {
@@ -80,18 +612,25 @@ pub fn find_cuts_start(
                     for t in targets {
                         set2.insert(t.clone());
                     }
+                } else {
+                    unknown.insert(act.clone());
                 }
             }
         }
     }
-
+    info!("Set1: {:?}", set1);
+    info!("Set2: {:?}", set2);
+    info!("Unknown: {:?}", unknown);
     if set1.len() + set2.len() == all_activities.len() {
         info!("Seq cut found: {:?} (->) {:?}", set1, set2);
+        find_best_cut(&seq_sets, &set1);
+        find_best_cut(&seq_sets, &set2);
     } else {
-        println!("Size of all activities: {}, set1: {}, set2: {}", all_activities.len(), set1.len(), set2.len());
+        info!("Size of all activities: {}, set1: {}, set2: {}", all_activities.len(), set1.len(), set2.len());
         info!("No sequential cut found, final sets: {:?} and {:?}", set1, set2);
     }
 }
+    
 
 pub fn find_cuts(
     dfg: &HashMap<(String, String), usize>,

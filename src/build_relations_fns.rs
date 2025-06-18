@@ -24,5 +24,12 @@ pub fn build_relations(
         }
     }
 
+    // After building your Vec<YourType> called `relations`
+    // relations.sort(); 
+
+    // First sorting by event id, then by timestamp
+    relations.sort_by(|a, b| a.0.cmp(&b.0));
+    relations.sort_by(|a, b| a.2.cmp(&b.2));
+
     relations
 }

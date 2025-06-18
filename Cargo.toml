@@ -5,7 +5,6 @@ edition = "2024"
 
 [dependencies]
 regex = "1.10.4"
-petgraph = "0.6"
 axum = "0.7"
 tokio = { version = "1.0", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
@@ -15,4 +14,5 @@ itertools = "0.14.0"
 tower-http = { version = "0.5.2", features = ["cors"] }
 log = "0.4"
 simplelog = "0.12"
-
+rustworkx-core = "0.14.2"
+petgraph = "0.6.5"

@@ -12,8 +12,10 @@ mod interaction_patterns;
 mod divergence_free_dfg;
 mod start_cuts;
 mod start_cuts_opti_v1;
+mod start_cuts_opti_v2;
 mod format_conversion;
 use log::info;
+mod cost_to_cut;
 
 //For REST API server
 use tokio::fs as tokiofs;
@@ -31,7 +33,7 @@ use serde_json::Value;
 
 // GET / — serves the content of dfg.json as JSON
 async fn hello() -> Json<Value> {
-    let file_content = tokiofs::read_to_string("dfs-diagrams/dfg_github_pm4py.json")
+    let file_content = tokiofs::read_to_string("dfs-diagrams/dfg_v1.json")
         .await
         .expect("Failed to read dfg.json");
     let json: Value = serde_json::from_str(&file_content)
@@ -71,15 +73,15 @@ fn main() {
         WriteLogger::new(LevelFilter::Info, Config::default(), File::create("process.log").unwrap()),
     ]).unwrap();
 
-    // let file_path = "data/small-example-v8.jsonocel";
+    let file_path = "data/small-example-v4.jsonocel";
     // let file_path = "data/running-example.jsonocel";
-    let file_path = "data/github_pm4py.jsonocel";
+    // let file_path = "data/github_pm4py.jsonocel";
 
     let file_content = stdfs::read_to_string(&file_path).unwrap();
     let ocel: OcelJson = serde_json::from_str(&file_content).unwrap();
 
     let relations = build_relations_fns::build_relations(&ocel.events, &ocel.objects);
-    info!("size of relations: {}", relations.len());
+    // info!("size of relations: {}", relations.len());
 
     let (div, con, rel, defi, all_activities, all_object_types) =
         interaction_patterns::get_interaction_patterns(&relations, &ocel);
@@ -88,7 +90,7 @@ fn main() {
     // info!("Convergent: {:?}",con);
     // info!("Relational: {:?}",rel);
     // info!("Deficiency {:?}",defi);
-    log_sorted_map("Divergent", &div);
+    // log_sorted_map("Divergent", &div);
     // log_sorted_map("Convergent", &con);
     // log_sorted_map("Relational", &rel);
     // log_sorted_map("Deficiency", &defi);
@@ -101,22 +103,23 @@ fn main() {
     print_dfg(&dfg);
 
     // let remove_list = vec![];
-    let remove_list = vec!["failed delivery".to_string(),"payment reminder".to_string()];
+    // let remove_list = vec!["failed delivery".to_string(),"payment reminder".to_string()];
+    let remove_list = vec!["reopened".to_string()];
     let filtered_dfg = filter_dfg(&dfg, &remove_list);
     let filtered_activities = filter_activities(&all_activities, &remove_list);
 
-    // let json_dfg = format_conversion::dfg_to_json(&dfg);
-    // let json_string = serde_json::to_string_pretty(&json_dfg).unwrap();
-    // // Save to file
-    // let mut file = File::create("dfs-diagrams/dfg_o2c.json").expect("Failed to create file");
-    // file.write_all(json_string.as_bytes()).expect("Failed to write to file");
+    let json_dfg = format_conversion::dfg_to_json(&dfg);
+    let json_string = serde_json::to_string_pretty(&json_dfg).unwrap();
+    // Save to file
+    let mut file = File::create("dfs-diagrams/dfg_github_pm4py.json").expect("Failed to create file");
+    file.write_all(json_string.as_bytes()).expect("Failed to write to file");
 
     let start_time = std::time::Instant::now();
 
     // let process_forest = start_cuts_gem::find_cuts(&dfg, &dfg, all_activities, &start_acts, &end_acts);
     // In case of filtering activities in the begining
     // let process_forest = start_cuts::find_cuts(&filtered_dfg, &filtered_dfg, filtered_activities, &start_acts, &end_acts);
-    let process_forest = start_cuts_opti_v1::find_cuts_start(&dfg, &filtered_activities);
+    let process_forest = start_cuts_opti_v2::find_cuts_start(&dfg, &filtered_activities);
 
     let elapsed = start_time.elapsed();
     println!("Time taken to form process_forest: {:.2?}", elapsed);

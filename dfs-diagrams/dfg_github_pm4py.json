@@ -1,512 +1,188 @@
 {
   "edges": [
     {
-      "id": "labeled->created",
-      "label": "Edge labeled-created",
-      "source": "labeled",
-      "target": "created"
+      "id": "add label 2->add label 1_1",
+      "label": "Edge add label 2-add label 1_1",
+      "source": "add label 2",
+      "target": "add label 1_1"
     },
     {
-      "id": "assigned->mentioned",
-      "label": "Edge assigned-mentioned",
-      "source": "assigned",
-      "target": "mentioned"
+      "id": "request->normal pack",
+      "label": "Edge request-normal pack",
+      "source": "request",
+      "target": "normal pack"
     },
     {
-      "id": "base_ref_changed->commented",
-      "label": "Edge base_ref_changed-commented",
-      "source": "base_ref_changed",
-      "target": "commented"
+      "id": "add label 2->add label 2_2",
+      "label": "Edge add label 2-add label 2_2",
+      "source": "add label 2",
+      "target": "add label 2_2"
     },
     {
-      "id": "assigned->added_to_project",
-      "label": "Edge assigned-added_to_project",
-      "source": "assigned",
-      "target": "added_to_project"
+      "id": "confirm pack->add label 1",
+      "label": "Edge confirm pack-add label 1",
+      "source": "confirm pack",
+      "target": "add label 1"
     },
     {
-      "id": "assigned->milestoned",
-      "label": "Edge assigned-milestoned",
-      "source": "assigned",
-      "target": "milestoned"
+      "id": "add label 2_2->add label 1_1",
+      "label": "Edge add label 2_2-add label 1_1",
+      "source": "add label 2_2",
+      "target": "add label 1_1"
     },
     {
-      "id": "commented->moved_columns_in_project",
-      "label": "Edge commented-moved_columns_in_project",
-      "source": "commented",
-      "target": "moved_columns_in_project"
+      "id": "confirm pack->add label 2",
+      "label": "Edge confirm pack-add label 2",
+      "source": "confirm pack",
+      "target": "add label 2"
     },
     {
-      "id": "created->cross-referenced",
-      "label": "Edge created-cross-referenced",
-      "source": "created",
-      "target": "cross-referenced"
+      "id": "charge->normal pack",
+      "label": "Edge charge-normal pack",
+      "source": "charge",
+      "target": "normal pack"
     },
     {
-      "id": "commented->renamed",
-      "label": "Edge commented-renamed",
-      "source": "commented",
-      "target": "renamed"
+      "id": "request->fragile pack",
+      "label": "Edge request-fragile pack",
+      "source": "request",
+      "target": "fragile pack"
     },
     {
-      "id": "base_ref_changed->created",
-      "label": "Edge base_ref_changed-created",
-      "source": "base_ref_changed",
-      "target": "created"
+      "id": "normal pack->confirm pack",
+      "label": "Edge normal pack-confirm pack",
+      "source": "normal pack",
+      "target": "confirm pack"
     },
     {
-      "id": "head_ref_deleted->head_ref_restored",
-      "label": "Edge head_ref_deleted-head_ref_restored",
-      "source": "head_ref_deleted",
-      "target": "head_ref_restored"
+      "id": "add label 2_2->send out",
+      "label": "Edge add label 2_2-send out",
+      "source": "add label 2_2",
+      "target": "send out"
     },
     {
-      "id": "head_ref_restored->created",
-      "label": "Edge head_ref_restored-created",
-      "source": "head_ref_restored",
-      "target": "created"
+      "id": "charge->fragile pack",
+      "label": "Edge charge-fragile pack",
+      "source": "charge",
+      "target": "fragile pack"
     },
     {
-      "id": "created->merged",
-      "label": "Edge created-merged",
-      "source": "created",
-      "target": "merged"
+      "id": "add label 1_1->add label 2_2",
+      "label": "Edge add label 1_1-add label 2_2",
+      "source": "add label 1_1",
+      "target": "add label 2_2"
     },
     {
-      "id": "created->added_to_project",
-      "label": "Edge created-added_to_project",
-      "source": "created",
-      "target": "added_to_project"
+      "id": "add label 1->add label 2_2",
+      "label": "Edge add label 1-add label 2_2",
+      "source": "add label 1",
+      "target": "add label 2_2"
     },
     {
-      "id": "added_to_project->labeled",
-      "label": "Edge added_to_project-labeled",
-      "source": "added_to_project",
-      "target": "labeled"
+      "id": "add label 2_2->add label 1",
+      "label": "Edge add label 2_2-add label 1",
+      "source": "add label 2_2",
+      "target": "add label 1"
     },
     {
-      "id": "labeled->added_to_project",
-      "label": "Edge labeled-added_to_project",
-      "source": "labeled",
-      "target": "added_to_project"
+      "id": "request->charge",
+      "label": "Edge request-charge",
+      "source": "request",
+      "target": "charge"
     },
     {
-      "id": "milestoned->renamed",
-      "label": "Edge milestoned-renamed",
-      "source": "milestoned",
-      "target": "renamed"
+      "id": "send out->complete",
+      "label": "Edge send out-complete",
+      "source": "send out",
+      "target": "complete"
     },
     {
-      "id": "commented->merged",
-      "label": "Edge commented-merged",
-      "source": "commented",
-      "target": "merged"
+      "id": "add label 1_1->send out",
+      "label": "Edge add label 1_1-send out",
+      "source": "add label 1_1",
+      "target": "send out"
     },
     {
-      "id": "created->commented",
-      "label": "Edge created-commented",
-      "source": "created",
-      "target": "commented"
+      "id": "confirm pack->complete",
+      "label": "Edge confirm pack-complete",
+      "source": "confirm pack",
+      "target": "complete"
     },
     {
-      "id": "created->labeled",
-      "label": "Edge created-labeled",
-      "source": "created",
-      "target": "labeled"
+      "id": "add label 2->add label 1",
+      "label": "Edge add label 2-add label 1",
+      "source": "add label 2",
+      "target": "add label 1"
     },
     {
-      "id": "assigned->labeled",
-      "label": "Edge assigned-labeled",
-      "source": "assigned",
-      "target": "labeled"
+      "id": "add label 1_1->add label 2",
+      "label": "Edge add label 1_1-add label 2",
+      "source": "add label 1_1",
+      "target": "add label 2"
     },
     {
-      "id": "reopened->merged",
-      "label": "Edge reopened-merged",
-      "source": "reopened",
-      "target": "merged"
+      "id": "add label 1->add label 1_1",
+      "label": "Edge add label 1-add label 1_1",
+      "source": "add label 1",
+      "target": "add label 1_1"
     },
     {
-      "id": "renamed->merged",
-      "label": "Edge renamed-merged",
-      "source": "renamed",
-      "target": "merged"
+      "id": "fragile pack->confirm pack",
+      "label": "Edge fragile pack-confirm pack",
+      "source": "fragile pack",
+      "target": "confirm pack"
     },
     {
-      "id": "milestoned->moved_columns_in_project",
-      "label": "Edge milestoned-moved_columns_in_project",
-      "source": "milestoned",
-      "target": "moved_columns_in_project"
-    },
-    {
-      "id": "closed->moved_columns_in_project",
-      "label": "Edge closed-moved_columns_in_project",
-      "source": "closed",
-      "target": "moved_columns_in_project"
-    },
-    {
-      "id": "closed->renamed",
-      "label": "Edge closed-renamed",
-      "source": "closed",
-      "target": "renamed"
-    },
-    {
-      "id": "cross-referenced->merged",
-      "label": "Edge cross-referenced-merged",
-      "source": "cross-referenced",
-      "target": "merged"
-    },
-    {
-      "id": "assigned->created",
-      "label": "Edge assigned-created",
-      "source": "assigned",
-      "target": "created"
-    },
-    {
-      "id": "milestoned->commented",
-      "label": "Edge milestoned-commented",
-      "source": "milestoned",
-      "target": "commented"
-    },
-    {
-      "id": "labeled->unlabeled",
-      "label": "Edge labeled-unlabeled",
-      "source": "labeled",
-      "target": "unlabeled"
-    },
-    {
-      "id": "milestoned->created",
-      "label": "Edge milestoned-created",
-      "source": "milestoned",
-      "target": "created"
-    },
-    {
-      "id": "commented->assigned",
-      "label": "Edge commented-assigned",
-      "source": "commented",
-      "target": "assigned"
-    },
-    {
-      "id": "created->subscribed",
-      "label": "Edge created-subscribed",
-      "source": "created",
-      "target": "subscribed"
-    },
-    {
-      "id": "created->closed",
-      "label": "Edge created-closed",
-      "source": "created",
-      "target": "closed"
-    },
-    {
-      "id": "unlabeled->assigned",
-      "label": "Edge unlabeled-assigned",
-      "source": "unlabeled",
-      "target": "assigned"
-    },
-    {
-      "id": "added_to_project->renamed",
-      "label": "Edge added_to_project-renamed",
-      "source": "added_to_project",
-      "target": "renamed"
-    },
-    {
-      "id": "base_ref_changed->merged",
-      "label": "Edge base_ref_changed-merged",
-      "source": "base_ref_changed",
-      "target": "merged"
-    },
-    {
-      "id": "head_ref_deleted->closed",
-      "label": "Edge head_ref_deleted-closed",
-      "source": "head_ref_deleted",
-      "target": "closed"
-    },
-    {
-      "id": "assigned->commented",
-      "label": "Edge assigned-commented",
-      "source": "assigned",
-      "target": "commented"
-    },
-    {
-      "id": "merged->closed",
-      "label": "Edge merged-closed",
-      "source": "merged",
-      "target": "closed"
-    },
-    {
-      "id": "commented->base_ref_changed",
-      "label": "Edge commented-base_ref_changed",
-      "source": "commented",
-      "target": "base_ref_changed"
-    },
-    {
-      "id": "added_to_project->milestoned",
-      "label": "Edge added_to_project-milestoned",
-      "source": "added_to_project",
-      "target": "milestoned"
-    },
-    {
-      "id": "added_to_project->assigned",
-      "label": "Edge added_to_project-assigned",
-      "source": "added_to_project",
-      "target": "assigned"
-    },
-    {
-      "id": "closed->head_ref_deleted",
-      "label": "Edge closed-head_ref_deleted",
-      "source": "closed",
-      "target": "head_ref_deleted"
-    },
-    {
-      "id": "renamed->commented",
-      "label": "Edge renamed-commented",
-      "source": "renamed",
-      "target": "commented"
-    },
-    {
-      "id": "assigned->cross-referenced",
-      "label": "Edge assigned-cross-referenced",
-      "source": "assigned",
-      "target": "cross-referenced"
-    },
-    {
-      "id": "created->head_ref_deleted",
-      "label": "Edge created-head_ref_deleted",
-      "source": "created",
-      "target": "head_ref_deleted"
-    },
-    {
-      "id": "created->mentioned",
-      "label": "Edge created-mentioned",
-      "source": "created",
-      "target": "mentioned"
-    },
-    {
-      "id": "created->renamed",
-      "label": "Edge created-renamed",
-      "source": "created",
-      "target": "renamed"
-    },
-    {
-      "id": "assigned->assigned",
-      "label": "Edge assigned-assigned",
-      "source": "assigned",
-      "target": "assigned"
-    },
-    {
-      "id": "milestoned->unassigned",
-      "label": "Edge milestoned-unassigned",
-      "source": "milestoned",
-      "target": "unassigned"
-    },
-    {
-      "id": "unlabeled->commented",
-      "label": "Edge unlabeled-commented",
-      "source": "unlabeled",
-      "target": "commented"
-    },
-    {
-      "id": "renamed->closed",
-      "label": "Edge renamed-closed",
-      "source": "renamed",
-      "target": "closed"
-    },
-    {
-      "id": "closed->merged",
-      "label": "Edge closed-merged",
-      "source": "closed",
-      "target": "merged"
-    },
-    {
-      "id": "milestoned->closed",
-      "label": "Edge milestoned-closed",
-      "source": "milestoned",
-      "target": "closed"
-    },
-    {
-      "id": "labeled->milestoned",
-      "label": "Edge labeled-milestoned",
-      "source": "labeled",
-      "target": "milestoned"
-    },
-    {
-      "id": "labeled->assigned",
-      "label": "Edge labeled-assigned",
-      "source": "labeled",
-      "target": "assigned"
-    },
-    {
-      "id": "added_to_project->commented",
-      "label": "Edge added_to_project-commented",
-      "source": "added_to_project",
-      "target": "commented"
-    },
-    {
-      "id": "renamed->milestoned",
-      "label": "Edge renamed-milestoned",
-      "source": "renamed",
-      "target": "milestoned"
-    },
-    {
-      "id": "created->base_ref_changed",
-      "label": "Edge created-base_ref_changed",
-      "source": "created",
-      "target": "base_ref_changed"
-    },
-    {
-      "id": "moved_columns_in_project->closed",
-      "label": "Edge moved_columns_in_project-closed",
-      "source": "moved_columns_in_project",
-      "target": "closed"
-    },
-    {
-      "id": "milestoned->added_to_project",
-      "label": "Edge milestoned-added_to_project",
-      "source": "milestoned",
-      "target": "added_to_project"
-    },
-    {
-      "id": "mentioned->base_ref_changed",
-      "label": "Edge mentioned-base_ref_changed",
-      "source": "mentioned",
-      "target": "base_ref_changed"
-    },
-    {
-      "id": "mentioned->created",
-      "label": "Edge mentioned-created",
-      "source": "mentioned",
-      "target": "created"
-    },
-    {
-      "id": "renamed->renamed",
-      "label": "Edge renamed-renamed",
-      "source": "renamed",
-      "target": "renamed"
-    },
-    {
-      "id": "merged->referenced",
-      "label": "Edge merged-referenced",
-      "source": "merged",
-      "target": "referenced"
-    },
-    {
-      "id": "milestoned->assigned",
-      "label": "Edge milestoned-assigned",
-      "source": "milestoned",
-      "target": "assigned"
-    },
-    {
-      "id": "created->referenced",
-      "label": "Edge created-referenced",
-      "source": "created",
-      "target": "referenced"
-    },
-    {
-      "id": "merged->head_ref_deleted",
-      "label": "Edge merged-head_ref_deleted",
-      "source": "merged",
-      "target": "head_ref_deleted"
-    },
-    {
-      "id": "created->assigned",
-      "label": "Edge created-assigned",
-      "source": "created",
-      "target": "assigned"
-    },
-    {
-      "id": "unassigned->closed",
-      "label": "Edge unassigned-closed",
-      "source": "unassigned",
-      "target": "closed"
-    },
-    {
-      "id": "commented->unassigned",
-      "label": "Edge commented-unassigned",
-      "source": "commented",
-      "target": "unassigned"
+      "id": "add label 1->add label 2",
+      "label": "Edge add label 1-add label 2",
+      "source": "add label 1",
+      "target": "add label 2"
     }
   ],
   "nodes": [
     {
-      "id": "labeled",
-      "label": "labeled"
+      "id": "add label 2",
+      "label": "add label 2"
     },
     {
-      "id": "created",
-      "label": "created"
+      "id": "add label 1_1",
+      "label": "add label 1_1"
     },
     {
-      "id": "assigned",
-      "label": "assigned"
+      "id": "request",
+      "label": "request"
     },
     {
-      "id": "mentioned",
-      "label": "mentioned"
+      "id": "normal pack",
+      "label": "normal pack"
     },
     {
-      "id": "base_ref_changed",
-      "label": "base_ref_changed"
+      "id": "add label 2_2",
+      "label": "add label 2_2"
     },
     {
-      "id": "commented",
-      "label": "commented"
+      "id": "confirm pack",
+      "label": "confirm pack"
     },
     {
-      "id": "added_to_project",
-      "label": "added_to_project"
+      "id": "add label 1",
+      "label": "add label 1"
     },
     {
-      "id": "milestoned",
-      "label": "milestoned"
+      "id": "charge",
+      "label": "charge"
     },
     {
-      "id": "moved_columns_in_project",
-      "label": "moved_columns_in_project"
+      "id": "fragile pack",
+      "label": "fragile pack"
     },
     {
-      "id": "cross-referenced",
-      "label": "cross-referenced"
+      "id": "send out",
+      "label": "send out"
     },
     {
-      "id": "renamed",
-      "label": "renamed"
-    },
-    {
-      "id": "head_ref_deleted",
-      "label": "head_ref_deleted"
-    },
-    {
-      "id": "head_ref_restored",
-      "label": "head_ref_restored"
-    },
-    {
-      "id": "merged",
-      "label": "merged"
-    },
-    {
-      "id": "reopened",
-      "label": "reopened"
-    },
-    {
-      "id": "closed",
-      "label": "closed"
-    },
-    {
-      "id": "unlabeled",
-      "label": "unlabeled"
-    },
-    {
-      "id": "subscribed",
-      "label": "subscribed"
-    },
-    {
-      "id": "unassigned",
-      "label": "unassigned"
-    },
-    {
-      "id": "referenced",
-      "label": "referenced"
+      "id": "complete",
+      "label": "complete"
     }
   ]
 }
