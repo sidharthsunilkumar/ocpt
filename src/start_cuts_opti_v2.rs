@@ -35,6 +35,13 @@ pub fn find_cuts_start(dfg: &HashMap<(String, String), usize>, all_activities: &
         find_cuts_start(&dfg, &para_set1);
         find_cuts_start(&dfg, &para_set2);  
     } 
+
+    let (redo_set1, redo_set2) = find_redo_cut(&filtered_dfg, &all_activities, &start_activities, &end_activities);
+    if (!redo_set2.is_empty() && !redo_set1.is_empty() && redo_cut_condition_check(&filtered_dfg, &redo_set1, &redo_set2, &start_activities, &end_activities)) {
+        info!("Redo cut found: {:?} (R) {:?}", redo_set1, redo_set2);
+        find_cuts_start(&dfg, &redo_set1);
+        find_cuts_start(&dfg, &redo_set2);  
+    }
 }
 
 // Exclusive cut and helpers --------------
@@ -106,23 +113,23 @@ fn find_exclusive_choice_cut(
 fn find_sequence_cut(dfg: &HashMap<(String, String), usize>, all_activities: &HashSet<String>)
 -> (HashSet<String>, HashSet<String>) {
     let sccs = strongly_connected_components(&dfg, &all_activities);
-    println!("SCCs:");
-    for (i, comp) in sccs.iter().enumerate() {
-        println!("  SCC {}: {:?}", i, comp);
-    }
+    // println!("SCCs:");
+    // for (i, comp) in sccs.iter().enumerate() {
+    //     println!("  SCC {}: {:?}", i, comp);
+    // }
 
     let (dag, _) = build_scc_dag(&sccs, &dfg);
-    println!("SCC DAG:");
-    for (from, tos) in &dag {
-        for to in tos {
-            println!("  SCC {} -> SCC {}", from, to);
-        }
-    }
+    // println!("SCC DAG:");
+    // for (from, tos) in &dag {
+    //     for to in tos {
+    //         println!("  SCC {} -> SCC {}", from, to);
+    //     }
+    // }
 
     let (set1, set2) = partition_scc_sets(&dag, &sccs);
 
-    println!("Set1 (sources): {:?}", set1);
-    println!("Set2 (targets): {:?}", set2);
+    // println!("Set1 (sources): {:?}", set1);
+    // println!("Set2 (targets): {:?}", set2);
 
     (set1, set2)
 }
@@ -259,9 +266,9 @@ pub fn partition_scc_sets(
         set1.remove(&i);
     }
 
-    println!("\nSCC index sets:");
-    println!("  Set1 (sources): {:?}", set1);
-    println!("  Set2 (targets): {:?}", set2);
+    // println!("\nSCC index sets:");
+    // println!("  Set1 (sources): {:?}", set1);
+    // println!("  Set2 (targets): {:?}", set2);
 
     // Step 5: Map SCCs to activity sets
     let mut act_set1 = HashSet::new();
@@ -279,9 +286,9 @@ pub fn partition_scc_sets(
         }
     }
 
-    println!("\nActivity sets:");
-    println!("  act_set1: {:?}", act_set1);
-    println!("  act_set2: {:?}", act_set2);
+    // println!("\nActivity sets:");
+    // println!("  act_set1: {:?}", act_set1);
+    // println!("  act_set2: {:?}", act_set2);
 
     (act_set1, act_set2)
 }
@@ -341,6 +348,113 @@ fn parallel_cut_condition_check(
     cond1 && cond2 && cond3 && cond4
 }
 
+// --------------------- Redo cut and helpers ---------------------
+fn find_redo_cut(
+    dfg: &HashMap<(String, String), usize>,
+    all_activities: &HashSet<String>,
+    start_activities: &HashSet<String>,
+    end_activities: &HashSet<String>,
+) -> (HashSet<String>, HashSet<String>) {
+    let mut set1: HashSet<String> = HashSet::new();
+    let mut set2: HashSet<String> = HashSet::new();
+
+    // Add start and end activities to set1
+    set1.extend(start_activities.iter().cloned());
+    set1.extend(end_activities.iter().cloned());
+
+    for x in all_activities {
+        if set1.contains(x) {
+            continue;
+        }
+
+        let is_redo = is_reachable_before_end_activity(start_activities, x, end_activities, dfg);
+
+        if is_redo {
+            set1.insert(x.clone());
+        } else {
+            set2.insert(x.clone());
+        }
+    }
+
+    (set1, set2)
+}
+
+fn redo_cut_condition_check(
+    dfg: &HashMap<(String, String), usize>,
+    set1: &HashSet<String>,
+    set2: &HashSet<String>,
+    start_activities: &HashSet<String>,
+    end_activities: &HashSet<String>,
+) -> bool {
+    // 1. All start_activities and end_activities must be in set1
+    if !start_activities.is_subset(set1) || !end_activities.is_subset(set1) {
+        return false;
+    }
+
+    // 2. There exists (e, x) ∈ dfg where e ∈ end_activities and x ∈ set2
+    let mut cond2 = false;
+    for e in end_activities {
+        for x in set2 {
+            if dfg.contains_key(&(e.clone(), x.clone())) {
+                cond2 = true;
+                break;
+            }
+        }
+        if cond2 {
+            break;
+        }
+    }
+    if !cond2 {
+        return false;
+    }
+
+    // 3. There exists (x, s) ∈ dfg where x ∈ set2 and s ∈ start_activities
+    let mut cond3 = false;
+    for x in set2 {
+        for s in start_activities {
+            if dfg.contains_key(&(x.clone(), s.clone())) {
+                cond3 = true;
+                break;
+            }
+        }
+        if cond3 {
+            break;
+        }
+    }
+    if !cond3 {
+        return false;
+    }
+
+    // 4. For every e ∈ end_activities, there exists b ∈ set2 such that (e, b) ∈ dfg
+    for e in end_activities {
+        let mut found = false;
+        for b in set2 {
+            if dfg.contains_key(&(e.clone(), b.clone())) {
+                found = true;
+                break;
+            }
+        }
+        if !found {
+            return false;
+        }
+    }
+
+    // 5. For every s ∈ start_activities, there exists b ∈ set2 such that (b, s) ∈ dfg
+    for s in start_activities {
+        let mut found = false;
+        for b in set2 {
+            if dfg.contains_key(&(b.clone(), s.clone())) {
+                found = true;
+                break;
+            }
+        }
+        if !found {
+            return false;
+        }
+    }
+
+    true
+}
 
 // --------------------- common helpers ---------------------
 
@@ -399,4 +513,48 @@ fn get_start_and_end_activities(
     // info!("End activities: {:?}", end_activities);
 
     (start_activities, end_activities)
+}
+
+fn is_reachable_before_end_activity(
+    start_activities: &HashSet<String>,
+    target: &String,
+    end_activities: &HashSet<String>,
+    dfg: &HashMap<(String, String), usize>,
+) -> bool {
+    fn dfs(
+        current: &String,
+        target: &String,
+        end_activities: &HashSet<String>,
+        dfg: &HashMap<(String, String), usize>,
+        visited: &mut HashSet<String>,
+    ) -> bool {
+        if current == target {
+            return true;
+        }
+
+        if visited.contains(current) || end_activities.contains(current) {
+            return false;
+        }
+
+        visited.insert(current.clone());
+
+        for (src, dst) in dfg.keys() {
+            if src == current {
+                if dfs(dst, target, end_activities, dfg, visited) {
+                    return true;
+                }
+            }
+        }
+
+        false
+    }
+
+    for start in start_activities {
+        let mut visited = HashSet::new();
+        if dfs(start, target, end_activities, dfg, &mut visited) {
+            return true;
+        }
+    }
+
+    false
 }

@@ -73,8 +73,8 @@ fn main() {
         WriteLogger::new(LevelFilter::Info, Config::default(), File::create("process.log").unwrap()),
     ]).unwrap();
 
-    let file_path = "data/small-example-v4.jsonocel";
-    // let file_path = "data/running-example.jsonocel";
+    // let file_path = "data/small-example-v7.jsonocel";
+    let file_path = "data/running-example.jsonocel";
     // let file_path = "data/github_pm4py.jsonocel";
 
     let file_content = stdfs::read_to_string(&file_path).unwrap();
@@ -103,8 +103,8 @@ fn main() {
     print_dfg(&dfg);
 
     // let remove_list = vec![];
-    // let remove_list = vec!["failed delivery".to_string(),"payment reminder".to_string()];
-    let remove_list = vec!["reopened".to_string()];
+    let remove_list = vec!["failed delivery".to_string(),"payment reminder".to_string()];
+    // let remove_list = vec!["reopened".to_string()];
     let filtered_dfg = filter_dfg(&dfg, &remove_list);
     let filtered_activities = filter_activities(&all_activities, &remove_list);
 
