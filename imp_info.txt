@@ -2,3 +2,48 @@ Time for process tree----------------------
 
 OG - 3004.93s
 With the 4 checking_cuts fns and info commented out - 346.87s
+
+
+How the normal optimised algo works--------------------------
+
+Sequence cut----
+1. It uses the dfg to create strongly connected group(SCC) of activities.
+2. It considers the SCCs as a single activity and finds how they are connected(edges between them).
+3. For 2 SCC a->b, all 'a's are put in set1, and 'b's in set2.
+4. Duplicated SCCs are removed from set1.
+5. Convert the SCCs to their orginal activities group.
+6. If either of the sets are empty, then sequence cut is not possible. If the entire graph is stringly connected, you will have only 1 SCC, and hence, this cut is not possible.
+
+Exclusive cut----
+1. Using dfg, find disjoint group of activities.
+2. Put 1st group to set1 and rest to set2.
+3. If either of the sets are empty, then exclusive cut is not possible.
+
+Parallel cut----
+1. Go through the activities 1 by 1.
+2. Put the first activity in set1.
+3. For an activity 'b', if it has to-and-from edges with every activity in set1, then put it in set2.
+4. Else if, if it has to-and-from edges with every activity in set2, then put it in set1.
+5. Else, return false as parallel cut is not possible.
+6. Also, check the extra conditions for parallel cut to be sure.
+
+Redo cut----
+1. Put start and end activities into set1.
+2. For the remaining activities, starting from a start activity, if it is possible to reach a remaining activity before reaching an end activity; and starting from an end activity, if it is not possible to reach the remaining activity before reaching a start activity, then put it in set1.
+3. Starting from a start activity, if it is not possible to reach a remaining activity before reaching an end activity; and starting from an end activity, if it is possible to reach the remaining activity before reaching a start activity, then put it in set2.
+4. Else, return false as redo cut is not possible.
+5. Also, check the extra conditions for redo cut to be sure.
+
+
+How the best cut with minimum cost algo works--------------------------
+
+Sequence cut----
+1. For every pair of activities (a,b), find the total cost(edges to be removed) in order to make 'a' non-reachable to 'b'.
+2. In each case, create a new dfg with those edges removed. Put 'b' in set1 and 'a' in set2.
+3. For every remaining activity 'c', if 'c' is reachable to 'b', put it in set1.
+4. Else, put 'c' in set2.
+5. Also, keep track of the size difference of the final set1 and set2. We want it as balanced as possible.
+6. Take the case with the minimum total cost. If multiple cases have same total cost, then take the one with least size difference.
+7. Return the best cost, edges to be cut, set1, set2, and the new dfg.
+
+Exclusive cut----

@@ -1,4 +1,6 @@
 use crate::cost_to_cut::to_be_non_reachable;
+use crate::good_cuts::best_possible_sequence_cut;
+use crate::best_sequence_cut::best_sequence_cut;
 use crate::types::{ProcessForest, TreeNode};
 use itertools::Itertools;
 use log::info;
@@ -8,40 +10,69 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 pub fn find_cuts_start(dfg: &HashMap<(String, String), usize>, all_activities: &HashSet<String>) {
 
+    if all_activities.len() <= 1 {
+        return;
+    }
+
+
     let filtered_dfg = filter_keep_dfg(&dfg, &all_activities);
     let (start_activities, end_activities) = get_start_and_end_activities(&dfg, &all_activities);
 
 
     // ----- perform cuts--------
 
+    
+
     let (excl_set1, excl_set2) = find_exclusive_choice_cut(&filtered_dfg, &all_activities);
     if(!excl_set1.is_empty() && !excl_set2.is_empty()) {
         info!("Exclusive cut found: {:?} (X) {:?}", excl_set1, excl_set2);
         find_cuts_start(&dfg, &excl_set1);
-        find_cuts_start(&dfg, &excl_set2);  
-    }
-    
+        find_cuts_start(&dfg, &excl_set2); 
+        return; 
+    } 
 
     let (set1, set2) = find_sequence_cut(&filtered_dfg, &all_activities);
     if(!set1.is_empty() && !set2.is_empty()) {
         info!("Sequence cut found: {:?} (->) {:?}", set1, set2);
         find_cuts_start(&dfg, &set1);
-        find_cuts_start(&dfg, &set2);  
+        find_cuts_start(&dfg, &set2);
+        return;
     }
+
+       
 
     let (is_parallel, para_set1, para_set2) = find_parallel_cut(&filtered_dfg, &all_activities);
     if(is_parallel && !para_set1.is_empty() && !para_set2.is_empty() && parallel_cut_condition_check(&para_set1, &para_set2, &start_activities, &end_activities)) {
         info!("Parallel cut found: {:?} (||) {:?}", para_set1, para_set2);
         find_cuts_start(&dfg, &para_set1);
         find_cuts_start(&dfg, &para_set2);  
+        return;
     } 
 
-    let (redo_set1, redo_set2) = find_redo_cut(&filtered_dfg, &all_activities, &start_activities, &end_activities);
-    if (!redo_set2.is_empty() && !redo_set1.is_empty() && redo_cut_condition_check(&filtered_dfg, &redo_set1, &redo_set2, &start_activities, &end_activities)) {
+    let (is_redo, redo_set1, redo_set2) = find_redo_cut(&filtered_dfg, &all_activities, &start_activities, &end_activities);
+    if (is_redo && !redo_set2.is_empty() && !redo_set1.is_empty() && redo_cut_condition_check(&filtered_dfg, &redo_set1, &redo_set2, &start_activities, &end_activities)) {
         info!("Redo cut found: {:?} (R) {:?}", redo_set1, redo_set2);
         find_cuts_start(&dfg, &redo_set1);
-        find_cuts_start(&dfg, &redo_set2);  
+        find_cuts_start(&dfg, &redo_set2); 
+        return; 
     }
+
+    info!("No further cuts found for the current set of activities: {:?}", all_activities);
+    info!("Checking for best possible sequence cut...");
+    // best_possible_sequence_cut(&filtered_dfg, &all_activities);
+    let (min_cost, no_of_cuts, cut_edges, bs_set1, bs_set2, new_dfg) = best_sequence_cut(&filtered_dfg, &all_activities);
+    info!("\n=== BEST SEQUENCE CUT RESULTS ===");
+    info!("Minimum Cost: {}", min_cost);
+    info!("Number of cut edges: {}", no_of_cuts);
+    info!("Cut Edges: {:?}", cut_edges);
+    info!("Set 1: {:?}", bs_set1);
+    info!("Set 2: {:?}", bs_set2);
+
+    find_cuts_start(&new_dfg, &bs_set1);
+    find_cuts_start(&new_dfg, &bs_set2);
+    return;
+
+
 }
 
 // Exclusive cut and helpers --------------
@@ -354,7 +385,7 @@ fn find_redo_cut(
     all_activities: &HashSet<String>,
     start_activities: &HashSet<String>,
     end_activities: &HashSet<String>,
-) -> (HashSet<String>, HashSet<String>) {
+) -> (bool, HashSet<String>, HashSet<String>) {
     let mut set1: HashSet<String> = HashSet::new();
     let mut set2: HashSet<String> = HashSet::new();
 
@@ -367,16 +398,19 @@ fn find_redo_cut(
             continue;
         }
 
-        let is_redo = is_reachable_before_end_activity(start_activities, x, end_activities, dfg);
+        let is_s1_redo = is_reachable_before_end_activity(start_activities, x, end_activities, dfg);
+        let is_s2_redo = is_reachable_before_end_activity(end_activities, x, start_activities, dfg);
 
-        if is_redo {
+        if is_s1_redo && !is_s2_redo{
             set1.insert(x.clone());
+        } else if (!is_s1_redo && is_s2_redo) {
+            set2.insert(x.clone());            
         } else {
-            set2.insert(x.clone());
+            return (false, set1, set2);
         }
     }
 
-    (set1, set2)
+    (true, set1, set2)
 }
 
 fn redo_cut_condition_check(

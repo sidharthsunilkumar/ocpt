@@ -16,6 +16,8 @@ mod start_cuts_opti_v2;
 mod format_conversion;
 use log::info;
 mod cost_to_cut;
+mod good_cuts;
+mod best_sequence_cut;
 
 //For REST API server
 use tokio::fs as tokiofs;
@@ -33,7 +35,7 @@ use serde_json::Value;
 
 // GET / — serves the content of dfg.json as JSON
 async fn hello() -> Json<Value> {
-    let file_content = tokiofs::read_to_string("dfs-diagrams/dfg_v1.json")
+    let file_content = tokiofs::read_to_string("dfs-diagrams/dfg_github_pm4py.json")
         .await
         .expect("Failed to read dfg.json");
     let json: Value = serde_json::from_str(&file_content)
@@ -74,8 +76,8 @@ fn main() {
     ]).unwrap();
 
     // let file_path = "data/small-example-v7.jsonocel";
-    let file_path = "data/running-example.jsonocel";
-    // let file_path = "data/github_pm4py.jsonocel";
+    // let file_path = "data/running-example.jsonocel";
+    let file_path = "data/github_pm4py.jsonocel";
 
     let file_content = stdfs::read_to_string(&file_path).unwrap();
     let ocel: OcelJson = serde_json::from_str(&file_content).unwrap();
@@ -103,23 +105,24 @@ fn main() {
     print_dfg(&dfg);
 
     // let remove_list = vec![];
-    let remove_list = vec!["failed delivery".to_string(),"payment reminder".to_string()];
-    // let remove_list = vec!["reopened".to_string()];
+    // let remove_list = vec!["failed delivery".to_string(),"payment reminder".to_string()];
+    let remove_list = vec!["reopened".to_string()];
     let filtered_dfg = filter_dfg(&dfg, &remove_list);
     let filtered_activities = filter_activities(&all_activities, &remove_list);
 
-    let json_dfg = format_conversion::dfg_to_json(&dfg);
-    let json_string = serde_json::to_string_pretty(&json_dfg).unwrap();
-    // Save to file
-    let mut file = File::create("dfs-diagrams/dfg_github_pm4py.json").expect("Failed to create file");
-    file.write_all(json_string.as_bytes()).expect("Failed to write to file");
+    // let json_dfg = format_conversion::dfg_to_json(&dfg);
+    // let json_string = serde_json::to_string_pretty(&json_dfg).unwrap();
+    // // Save to file
+    // let mut file = File::create("dfs-diagrams/dfg_github_pm4py.json").expect("Failed to create file");
+    // file.write_all(json_string.as_bytes()).expect("Failed to write to file");
 
     let start_time = std::time::Instant::now();
 
     // let process_forest = start_cuts_gem::find_cuts(&dfg, &dfg, all_activities, &start_acts, &end_acts);
     // In case of filtering activities in the begining
     // let process_forest = start_cuts::find_cuts(&filtered_dfg, &filtered_dfg, filtered_activities, &start_acts, &end_acts);
-    let process_forest = start_cuts_opti_v2::find_cuts_start(&dfg, &filtered_activities);
+    let process_forest = start_cuts_opti_v2::find_cuts_start(&filtered_dfg, &filtered_activities);
+
 
     let elapsed = start_time.elapsed();
     println!("Time taken to form process_forest: {:.2?}", elapsed);

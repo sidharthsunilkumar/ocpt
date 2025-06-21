@@ -68,6 +68,101 @@ fn find_paths_dfs(
 
 fn find_min_edge_cut(
     dfg: &HashMap<(String, String), usize>,
+    paths: &[Vec<String>], // Not used in Edmonds-Karp, but kept for signature compatibility
+) -> (usize, usize, Vec<(String, String)>) {
+    use std::collections::VecDeque;
+
+    // Build adjacency list and capacity map
+    let mut capacity = HashMap::new();
+    let mut adj = HashMap::<String, Vec<String>>::new();
+    for ((from, to), &cap) in dfg.iter() {
+        capacity.insert((from.clone(), to.clone()), cap);
+        adj.entry(from.clone()).or_default().push(to.clone());
+        adj.entry(to.clone()).or_default(); // Ensure all nodes are present
+    }
+
+    let source = if let Some(path) = paths.first() {
+        path.first().cloned().unwrap_or_default()
+    } else {
+        return (0, 0, Vec::new());
+    };
+    let sink = if let Some(path) = paths.first() {
+        path.last().cloned().unwrap_or_default()
+    } else {
+        return (0, 0, Vec::new());
+    };
+
+    let mut flow = 0;
+    let mut residual = capacity.clone();
+
+    // Edmonds-Karp BFS to find augmenting paths
+    loop {
+        let mut parent = HashMap::<String, String>::new();
+        let mut q = VecDeque::new();
+        q.push_back(source.clone());
+
+        while let Some(u) = q.pop_front() {
+            for v in adj.get(&u).unwrap() {
+                if !parent.contains_key(v) && *residual.get(&(u.clone(), v.clone())).unwrap_or(&0) > 0 && v != &source {
+                    parent.insert(v.clone(), u.clone());
+                    q.push_back(v.clone());
+                }
+            }
+        }
+
+        if !parent.contains_key(&sink) {
+            break;
+        }
+
+        // Find minimum residual capacity along the path
+        let mut v = sink.clone();
+        let mut path_flow = usize::MAX;
+        while let Some(u) = parent.get(&v) {
+            let cap = *residual.get(&(u.clone(), v.clone())).unwrap_or(&0);
+            path_flow = path_flow.min(cap);
+            v = u.clone();
+        }
+
+        // Update residual capacities
+        let mut v = sink.clone();
+        while let Some(u) = parent.get(&v) {
+            *residual.get_mut(&(u.clone(), v.clone())).unwrap() -= path_flow;
+            *residual.entry((v.clone(), u.clone())).or_insert(0) += path_flow;
+            v = u.clone();
+        }
+
+        flow += path_flow;
+    }
+
+    // After max-flow, find reachable vertices from source in residual graph
+    let mut visited = HashSet::new();
+    let mut q = VecDeque::new();
+    q.push_back(source.clone());
+    while let Some(u) = q.pop_front() {
+        if visited.insert(u.clone()) {
+            for v in adj.get(&u).unwrap() {
+                if *residual.get(&(u.clone(), v.clone())).unwrap_or(&0) > 0 && !visited.contains(v) {
+                    q.push_back(v.clone());
+                }
+            }
+        }
+    }
+
+    // Edges from visited to unvisited are the min-cut
+    let mut cut_edges = Vec::new();
+    let mut cut_weight = 0;
+    for ((u, v), &cap) in capacity.iter() {
+        if visited.contains(u) && !visited.contains(v) {
+            cut_edges.push((u.clone(), v.clone()));
+            cut_weight += cap;
+        }
+    }
+
+    (cut_edges.len(), cut_weight, cut_edges)
+}
+
+fn find_min_edge_cut_old(
+    dfg: &HashMap<(String, String), usize>,
     paths: &[Vec<String>],
 ) -> (usize, usize, Vec<(String, String)>) {
     // Extract all edges from the original graph
@@ -145,7 +240,7 @@ fn is_disconnected(
 }
 
 // Helper function to check reachability (same as your original)
-fn is_reachable(
+pub fn is_reachable(
     dfg: &HashMap<(String, String), usize>,
     activity1: &str,
     activity2: &str,
