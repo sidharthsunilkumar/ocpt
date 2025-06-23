@@ -1,34 +1,10 @@
 {
   "edges": [
     {
-      "id": "fragile pack->fragile pack 2",
-      "label": "Edge fragile pack-fragile pack 2",
-      "source": "fragile pack",
-      "target": "fragile pack 2"
-    },
-    {
       "id": "send out->complete",
       "label": "Edge send out-complete",
       "source": "send out",
       "target": "complete"
-    },
-    {
-      "id": "normal pack 2->confirm pack",
-      "label": "Edge normal pack 2-confirm pack",
-      "source": "normal pack 2",
-      "target": "confirm pack"
-    },
-    {
-      "id": "confirm pack->add label 1",
-      "label": "Edge confirm pack-add label 1",
-      "source": "confirm pack",
-      "target": "add label 1"
-    },
-    {
-      "id": "add label 2->add label 1",
-      "label": "Edge add label 2-add label 1",
-      "source": "add label 2",
-      "target": "add label 1"
     },
     {
       "id": "confirm pack->complete",
@@ -37,34 +13,40 @@
       "target": "complete"
     },
     {
-      "id": "add label 2->send out",
-      "label": "Edge add label 2-send out",
+      "id": "request->normal pack 1",
+      "label": "Edge request-normal pack 1",
+      "source": "request",
+      "target": "normal pack 1"
+    },
+    {
+      "id": "request->fragile pack 1",
+      "label": "Edge request-fragile pack 1",
+      "source": "request",
+      "target": "fragile pack 1"
+    },
+    {
+      "id": "add label 1->add label 2",
+      "label": "Edge add label 1-add label 2",
+      "source": "add label 1",
+      "target": "add label 2"
+    },
+    {
+      "id": "normal pack 2->confirm pack",
+      "label": "Edge normal pack 2-confirm pack",
+      "source": "normal pack 2",
+      "target": "confirm pack"
+    },
+    {
+      "id": "add label 2->add label 1",
+      "label": "Edge add label 2-add label 1",
       "source": "add label 2",
-      "target": "send out"
+      "target": "add label 1"
     },
     {
-      "id": "normal pack->normal pack 2",
-      "label": "Edge normal pack-normal pack 2",
-      "source": "normal pack",
-      "target": "normal pack 2"
-    },
-    {
-      "id": "request->normal pack",
-      "label": "Edge request-normal pack",
-      "source": "request",
-      "target": "normal pack"
-    },
-    {
-      "id": "charge->normal pack",
-      "label": "Edge charge-normal pack",
-      "source": "charge",
-      "target": "normal pack"
-    },
-    {
-      "id": "request->charge",
-      "label": "Edge request-charge",
-      "source": "request",
-      "target": "charge"
+      "id": "confirm pack->add label 1",
+      "label": "Edge confirm pack-add label 1",
+      "source": "confirm pack",
+      "target": "add label 1"
     },
     {
       "id": "add label 1->send out",
@@ -73,16 +55,40 @@
       "target": "send out"
     },
     {
-      "id": "charge->fragile pack",
-      "label": "Edge charge-fragile pack",
+      "id": "charge->normal pack 1",
+      "label": "Edge charge-normal pack 1",
       "source": "charge",
-      "target": "fragile pack"
+      "target": "normal pack 1"
     },
     {
-      "id": "confirm pack->add label 2",
-      "label": "Edge confirm pack-add label 2",
-      "source": "confirm pack",
-      "target": "add label 2"
+      "id": "add label 2->send out",
+      "label": "Edge add label 2-send out",
+      "source": "add label 2",
+      "target": "send out"
+    },
+    {
+      "id": "charge->fragile pack 1",
+      "label": "Edge charge-fragile pack 1",
+      "source": "charge",
+      "target": "fragile pack 1"
+    },
+    {
+      "id": "request->charge",
+      "label": "Edge request-charge",
+      "source": "request",
+      "target": "charge"
+    },
+    {
+      "id": "normal pack 1->normal pack 2",
+      "label": "Edge normal pack 1-normal pack 2",
+      "source": "normal pack 1",
+      "target": "normal pack 2"
+    },
+    {
+      "id": "fragile pack 1->fragile pack 2",
+      "label": "Edge fragile pack 1-fragile pack 2",
+      "source": "fragile pack 1",
+      "target": "fragile pack 2"
     },
     {
       "id": "fragile pack 2->confirm pack",
@@ -91,27 +97,13 @@
       "target": "confirm pack"
     },
     {
-      "id": "request->fragile pack",
-      "label": "Edge request-fragile pack",
-      "source": "request",
-      "target": "fragile pack"
-    },
-    {
-      "id": "add label 1->add label 2",
-      "label": "Edge add label 1-add label 2",
-      "source": "add label 1",
+      "id": "confirm pack->add label 2",
+      "label": "Edge confirm pack-add label 2",
+      "source": "confirm pack",
       "target": "add label 2"
     }
   ],
   "nodes": [
-    {
-      "id": "fragile pack",
-      "label": "fragile pack"
-    },
-    {
-      "id": "fragile pack 2",
-      "label": "fragile pack 2"
-    },
     {
       "id": "send out",
       "label": "send out"
@@ -121,12 +113,20 @@
       "label": "complete"
     },
     {
-      "id": "normal pack 2",
-      "label": "normal pack 2"
-    },
-    {
       "id": "confirm pack",
       "label": "confirm pack"
+    },
+    {
+      "id": "request",
+      "label": "request"
+    },
+    {
+      "id": "normal pack 1",
+      "label": "normal pack 1"
+    },
+    {
+      "id": "fragile pack 1",
+      "label": "fragile pack 1"
     },
     {
       "id": "add label 1",
@@ -137,16 +137,16 @@
       "label": "add label 2"
     },
     {
-      "id": "normal pack",
-      "label": "normal pack"
-    },
-    {
-      "id": "request",
-      "label": "request"
+      "id": "normal pack 2",
+      "label": "normal pack 2"
     },
     {
       "id": "charge",
       "label": "charge"
+    },
+    {
+      "id": "fragile pack 2",
+      "label": "fragile pack 2"
     }
   ]
 }

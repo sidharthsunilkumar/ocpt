@@ -10,7 +10,8 @@ Sequence cut----
 1. It uses the dfg to create strongly connected group(SCC) of activities.
 2. It considers the SCCs as a single activity and finds how they are connected(edges between them).
 3. For 2 SCC a->b, all 'a's are put in set1, and 'b's in set2.
-4. Duplicated SCCs are removed from set1.
+4. Remove duplicated SCCs  and put it into a seperate list.
+5. For each activity 'c' in the duplicated list, and for every activity 's' in set1, if 's' can reach 'c' and 'c' cannot reach 's', put it in set2, else put it in set1. 
 5. Convert the SCCs to their orginal activities group.
 6. If either of the sets are empty, then sequence cut is not possible. If the entire graph is stringly connected, you will have only 1 SCC, and hence, this cut is not possible.
 
@@ -47,3 +48,109 @@ Sequence cut----
 7. Return the best cost, edges to be cut, set1, set2, and the new dfg.
 
 Exclusive cut----
+1. For every pair of activities (a,b), find the total cost(edges to be removed) in order to make 'a' non-reachable to 'b' and 'b' non-reachable to 'a'.
+2. In each case, create a new dfg with those edges removed. Put 'a' in set1 and 'b' in set2.
+3. For every remaining activity 'c', find the reachability of 'c' with 'a' and 'b'.
+4. Based of above, put 'c' in set1 or set1. In some cases, more edges will need to be deleted.
+5. Also, keep track of the size difference of the final set1 and set2. We want it as balanced as possible.
+6. Take the case with the minimum total cost. If multiple cases have same total cost, then take the one with least size difference.
+7. Return the best cost, edges to be cut, set1, set2, and the new dfg.
+Psudocode-
+For every pair of activity(a,b){
+	set1={a}
+	set2={b}
+	r1_min_cut, r1_cost, r1_cut_edges=non_reachable(dfg,a,b)
+	r2_min_cut, r2_cost, r2_cut_edges=non_reachable(dfg,b,a)
+	total_min_cut, total_cost, total_cut_edges=r1_min_cut+r2_min_cut, r1_cost+r2_cost, r1_cut_edges+r2_cut_edges
+	create new_dfg with edges of r1_cut_edges and r2_cut_edges removed
+	for every remaining activity c{
+		c_a = is_reachable(new_dfg, c,a)
+		c_b = is_reachable(new_dfg, c,b)
+		a_c = is_reachable(new_dfg, a,c)
+		b_c = is_reachable(new_dfg, b,c)
+
+		if((c_a or a_c) and !c_b and !b_c){
+			insert c in set1
+		} else if((c_b or b_c) and !c_a and !a_c){
+			insert c in set2
+		} else if( !(c_a or a_c or c_b or _c) ){
+			insert c in set1 or set2 depending of whichever has lower elements in it.
+		}
+		else {
+			c11_min_cut, c11_cost, c11_cut_edges=non_reachable(new_dfg,a,c)
+			new_dfg_c11 = new_dfg with c11_cut_edges removed
+			c12_min_cut, c12_cost, c12_cut_edges=non_reachable(new_dfg_c11,c,a)
+			c1_min_cut, c1_cost, c1_cut_edges = c11_min_cut+c12_min_cut, c11_cost+c12_cost, c11_cut_edges+c12_cut_edges
+			new_dfg_c1 = new_dfg_c11 with c12_cut_edges removed
+
+			c21_min_cut, c21_cost, c21_cut_edges=non_reachable(new_dfg,b,c)
+			new_dfg_c21 = new_dfg with c21_cut_edges removed
+			c22_min_cut, c22_cost, c22_cut_edges=non_reachable(new_dfg_c21,c,a)
+			c2_min_cut, c2_cost, c2_cut_edges = c21_min_cut+c22_min_cut, c21_cost+c22_cost, c21_cut_edges+c22_cut_edges
+			new_dfg_c2 = new_dfg_c21 with c22_cut_edges removed
+
+			if(c1_cost<c2_cost){
+				insert c in set1
+				total_min_cut+=c1_min_cost
+				total_cost+=c1_cost
+				total_cut_edges+=c1_cut_edges
+				new_dfg=new_dfg_c1
+			}
+			if(c2_cost<c1_cost){
+				insert c in set2
+				total_min_cut+=c2_min_cost
+				total_cost+=c2_cost
+				total_cut_edges+=c2_cut_edges
+				new_dfg=new_dfg_c2
+			} else{
+				if(size(set1)<=size(set2)){
+					insert c in set1
+					total_min_cut+=c1_min_cost
+					total_cost+=c1_cost
+					total_cut_edges+=c1_cut_edges
+					new_dfg=new_dfg_c1
+				} else{
+					insert c in set2
+					total_min_cut+=c2_min_cost
+					total_cost+=c2_cost
+					total_cut_edges+=c2_cut_edges
+					new_dfg=new_dfg_c2
+				}
+			}
+			
+		}
+	}
+}
+
+Parallel cut----
+Complete Step-by-Step Heuristic Method for 30 Nodes
+Here's the detailed breakdown of how the heuristic works:
+STEP 1: Multiple Random Restarts (Diversification)
+
+Why: With 2³⁰ possible partitions, we need multiple starting points
+How: Try 50 different random initial partitions
+Goal: Explore different regions of the solution space
+
+STEP 2: Generate Smart Initial Partitions
+
+Avoid extreme imbalance: Don't put all 29 activities in one set and 1 in another
+Rule: Each set should have at least 25% of total activities (7-8 minimum)
+Method: Randomly select 7-23 activities for Set1, rest go to Set2
+
+STEP 3: Local Search Improvement (Hill Climbing)
+For each initial partition:
+
+Try moving each activity to the other set
+Calculate cost change for each possible move
+Apply the best move that reduces cost
+Repeat until no improvement is possible
+
+STEP 4: Cost Calculation (The Core Logic)
+For any partition (Set1, Set2):
+Required edges = |Set1| × |Set2| × 2  (bidirectional)
+Cost = Required edges - Existing cross-partition edges
+STEP 5: Advanced Optimization Techniques
+
+Activity Swaps: Try swapping pairs of activities between sets
+Balance Optimization: If sets are very imbalanced, try rebalancing
+2-opt Style Moves: More sophisticated neighborhood exploration

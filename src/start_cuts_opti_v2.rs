@@ -1,6 +1,9 @@
+use crate::best_parallel_cut_exhaustive::best_parallel_cut_exhaustive;
 use crate::cost_to_cut::to_be_non_reachable;
 use crate::good_cuts::best_possible_sequence_cut;
 use crate::best_sequence_cut::best_sequence_cut;
+use crate::best_exclusive_cut::best_exclusive_cut;
+use crate::best_parallel_cut::best_parallel_cut;
 use crate::types::{ProcessForest, TreeNode};
 use itertools::Itertools;
 use log::info;
@@ -8,7 +11,11 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 
 
-pub fn find_cuts_start(dfg: &HashMap<(String, String), usize>, all_activities: &HashSet<String>) {
+pub fn find_cuts_start(
+    dfg: &HashMap<(String, String), usize>, 
+    all_activities: &HashSet<String>,
+    start_activities: &HashSet<String>,
+    end_activities: &HashSet<String>) {
 
     if all_activities.len() <= 1 {
         return;
@@ -16,7 +23,7 @@ pub fn find_cuts_start(dfg: &HashMap<(String, String), usize>, all_activities: &
 
 
     let filtered_dfg = filter_keep_dfg(&dfg, &all_activities);
-    let (start_activities, end_activities) = get_start_and_end_activities(&dfg, &all_activities);
+    let (start_activities, end_activities) = get_start_and_end_activities(&dfg, &all_activities, &start_activities, &end_activities);
 
 
     // ----- perform cuts--------
@@ -26,16 +33,16 @@ pub fn find_cuts_start(dfg: &HashMap<(String, String), usize>, all_activities: &
     let (excl_set1, excl_set2) = find_exclusive_choice_cut(&filtered_dfg, &all_activities);
     if(!excl_set1.is_empty() && !excl_set2.is_empty()) {
         info!("Exclusive cut found: {:?} (X) {:?}", excl_set1, excl_set2);
-        find_cuts_start(&dfg, &excl_set1);
-        find_cuts_start(&dfg, &excl_set2); 
+        find_cuts_start(&dfg, &excl_set1, &start_activities, &end_activities);
+        find_cuts_start(&dfg, &excl_set2, &start_activities, &end_activities); 
         return; 
     } 
 
     let (set1, set2) = find_sequence_cut(&filtered_dfg, &all_activities);
     if(!set1.is_empty() && !set2.is_empty()) {
         info!("Sequence cut found: {:?} (->) {:?}", set1, set2);
-        find_cuts_start(&dfg, &set1);
-        find_cuts_start(&dfg, &set2);
+        find_cuts_start(&dfg, &set1, &start_activities, &end_activities);
+        find_cuts_start(&dfg, &set2, &start_activities, &end_activities);
         return;
     }
 
@@ -44,33 +51,67 @@ pub fn find_cuts_start(dfg: &HashMap<(String, String), usize>, all_activities: &
     let (is_parallel, para_set1, para_set2) = find_parallel_cut(&filtered_dfg, &all_activities);
     if(is_parallel && !para_set1.is_empty() && !para_set2.is_empty() && parallel_cut_condition_check(&para_set1, &para_set2, &start_activities, &end_activities)) {
         info!("Parallel cut found: {:?} (||) {:?}", para_set1, para_set2);
-        find_cuts_start(&dfg, &para_set1);
-        find_cuts_start(&dfg, &para_set2);  
+        find_cuts_start(&dfg, &para_set1, &start_activities, &end_activities);
+        find_cuts_start(&dfg, &para_set2, &start_activities, &end_activities);  
         return;
     } 
 
     let (is_redo, redo_set1, redo_set2) = find_redo_cut(&filtered_dfg, &all_activities, &start_activities, &end_activities);
     if (is_redo && !redo_set2.is_empty() && !redo_set1.is_empty() && redo_cut_condition_check(&filtered_dfg, &redo_set1, &redo_set2, &start_activities, &end_activities)) {
         info!("Redo cut found: {:?} (R) {:?}", redo_set1, redo_set2);
-        find_cuts_start(&dfg, &redo_set1);
-        find_cuts_start(&dfg, &redo_set2); 
+        find_cuts_start(&dfg, &redo_set1, &start_activities, &end_activities);
+        find_cuts_start(&dfg, &redo_set2, &start_activities, &end_activities); 
         return; 
     }
 
     info!("No further cuts found for the current set of activities: {:?}", all_activities);
-    info!("Checking for best possible sequence cut...");
-    // best_possible_sequence_cut(&filtered_dfg, &all_activities);
-    let (min_cost, no_of_cuts, cut_edges, bs_set1, bs_set2, new_dfg) = best_sequence_cut(&filtered_dfg, &all_activities);
-    info!("\n=== BEST SEQUENCE CUT RESULTS ===");
-    info!("Minimum Cost: {}", min_cost);
-    info!("Number of cut edges: {}", no_of_cuts);
-    info!("Cut Edges: {:?}", cut_edges);
-    info!("Set 1: {:?}", bs_set1);
-    info!("Set 2: {:?}", bs_set2);
 
-    find_cuts_start(&new_dfg, &bs_set1);
-    find_cuts_start(&new_dfg, &bs_set2);
+    // info!("Checking for best possible sequence cut...");
+    // let (bs_min_cost, bs_no_of_cuts, bs_cut_edges, bs_set1, bs_set2, new_dfg) = best_sequence_cut(&filtered_dfg, &all_activities);
+    // info!("\n=== BEST SEQUENCE CUT RESULTS ===");
+    // info!("Minimum Cost: {}", bs_min_cost);
+    // info!("Number of cut edges: {}", bs_no_of_cuts);
+    // info!("Cut Edges: {:?}", bs_cut_edges);
+    // info!("Set 1: {:?}", bs_set1);
+    // info!("Set 2: {:?}", bs_set2);
+
+    // find_cuts_start(&new_dfg, &bs_set1, &start_activities, &end_activities);
+    // find_cuts_start(&new_dfg, &bs_set2, &start_activities, &end_activities);
+    // return;
+
+    info!("Checking for best possible exclusive cut...");
+    let (be_min_cost, be_no_of_cuts,be_cut_edges, be_set1, be_set2, be_new_dfg) = best_exclusive_cut(&filtered_dfg, &all_activities);
+    info!("\n=== BEST EXCLUSIVE CUT RESULTS ===");
+    info!("Minimum Cost: {}", be_min_cost);
+    info!("Number of cut edges: {}", be_no_of_cuts);
+    info!("Cut Edges: {:?}", be_cut_edges);
+    info!("Set 1: {:?}", be_set1);
+    info!("Set 2: {:?}", be_set2);
+
+    find_cuts_start(&be_new_dfg, &be_set1, &start_activities, &end_activities);
+    find_cuts_start(&be_new_dfg, &be_set2, &start_activities, &end_activities);
     return;
+
+    // info!("Checking for best possible parallel cut...");
+    // let result = best_parallel_cut(&dfg, &all_activities);    
+    // info!("\n=== BEST PARALLEL CUT RESULTS ===");
+    // info!("Minimum cost: {}", result.minimum_cost);
+    // info!("Number of edges added: {}", result.num_edges_added);
+    // info!("Set1: {:?}", result.set1);
+    // info!("Set2: {:?}", result.set2);
+    // find_cuts_start(&result.new_dfg, &result.set1);
+    // find_cuts_start(&result.new_dfg, &result.set2);
+    // return;
+
+    // info!("Checking for best possible exhaustive parallel cut...");
+    // let result = best_parallel_cut_exhaustive(&dfg, &all_activities);    
+    // info!("\n=== BEST PARALLEL CUT RESULTS ===");
+    // info!("Minimum cost: {}", result.minimum_cost);
+    // info!("Number of edges added: {}", result.num_edges_added);
+    // info!("Set1: {:?}", result.set1);
+    // info!("Set2: {:?}", result.set2);
+    // info!("Original edges: {}", dfg.len());
+    // info!("New DFG edges: {}", result.new_dfg.len());
 
 
 }
@@ -281,7 +322,7 @@ pub fn partition_scc_sets(
     dag: &HashMap<usize, HashSet<usize>>,
     sccs: &Vec<Vec<String>>,
 ) -> (HashSet<String>, HashSet<String>) {
-    // Step 3: Create set1 and set2
+    // Create set1 and set2
     let mut set1: HashSet<usize> = HashSet::new();
     let mut set2: HashSet<usize> = HashSet::new();
     for (from, tos) in dag {
@@ -290,38 +331,75 @@ pub fn partition_scc_sets(
             set2.insert(*to);
         }
     }
-
-    // Step 4: Remove overlaps from set1
+    
+    // Find common activities and remove them from both sets
     let intersection: HashSet<_> = set1.intersection(&set2).cloned().collect();
-    for i in intersection {
-        set1.remove(&i);
+    let mut common_activities = intersection.clone();
+    
+    for i in &intersection {
+        set1.remove(i);
+        set2.remove(i);
     }
-
-    // println!("\nSCC index sets:");
-    // println!("  Set1 (sources): {:?}", set1);
-    // println!("  Set2 (targets): {:?}", set2);
-
-    // Step 5: Map SCCs to activity sets
+    
+    // For each common activity, decide whether to put it in set1 or set2
+    for c in common_activities {
+        let mut all_can_reach_and_c_cannot_reach_back = true;
+        
+        // Check if every activity 't' in set1 can reach 'c', and 'c' cannot reach 't'
+        for t in &set1 {
+            if !is_reachable_in_dag(dag, *t, c) || is_reachable_in_dag(dag, c, *t) {
+                all_can_reach_and_c_cannot_reach_back = false;
+                break;
+            }
+        }
+        
+        if all_can_reach_and_c_cannot_reach_back {
+            set2.insert(c);
+        } else {
+            set1.insert(c);
+        }
+    }
+    
+    // Map SCCs to activity sets
     let mut act_set1 = HashSet::new();
     let mut act_set2 = HashSet::new();
-
+    
     for i in &set1 {
         for act in &sccs[*i] {
             act_set1.insert(act.clone());
         }
     }
-
+    
     for i in &set2 {
         for act in &sccs[*i] {
             act_set2.insert(act.clone());
         }
     }
-
-    // println!("\nActivity sets:");
-    // println!("  act_set1: {:?}", act_set1);
-    // println!("  act_set2: {:?}", act_set2);
-
+    
     (act_set1, act_set2)
+}
+
+pub fn is_reachable_in_dag(
+    dag: &HashMap<usize, HashSet<usize>>,
+    activity1: usize,
+    activity2: usize,
+) -> bool {
+    let mut visited = HashSet::new();
+    let mut stack = vec![activity1];
+    
+    while let Some(current) = stack.pop() {
+        if current == activity2 {
+            return true;
+        }
+        if visited.insert(current) {
+            if let Some(neighbors) = dag.get(&current) {
+                for &neighbor in neighbors {
+                    stack.push(neighbor);
+                }
+            }
+        }
+    }
+    false
 }
 
 // --------------------- Parallel cut and helpers ---------------------
@@ -522,29 +600,36 @@ fn check_bi_direction_sets(
 fn get_start_and_end_activities(
     dfg: &HashMap<(String, String), usize>,
     filtered_activities: &HashSet<String>,
+    global_start_activities: &HashSet<String>,
+    global_end_activities: &HashSet<String>,
 ) -> (HashSet<String>, HashSet<String>) {
     let mut start_activities = HashSet::new();
     let mut end_activities = HashSet::new();
 
-    // info!("Getting start and end activities based on filtered set...");
+    for ((a, b), _) in dfg {
+        let a_in = filtered_activities.contains(a);
+        let b_in = filtered_activities.contains(b);
 
-    for ((from, to), _) in dfg {
-        let from_in = filtered_activities.contains(from);
-        let to_in = filtered_activities.contains(to);
-
-        if to_in && !from_in {
-            // 'to' is inside filtered, 'from' is outside → 'to' is a start activity
-            start_activities.insert(to.clone());
+        if !a_in && b_in {
+            // 'a' is outside and 'b' is inside → 'b' is a start activity
+            start_activities.insert(b.clone());
         }
 
-        if from_in && !to_in {
-            // 'from' is inside filtered, 'to' is outside → 'from' is an end activity
-            end_activities.insert(from.clone());
+        if a_in && !b_in {
+            // 'a' is inside and 'b' is outside → 'a' is an end activity
+            end_activities.insert(a.clone());
         }
     }
 
-    // info!("Start activities: {:?}", start_activities);
-    // info!("End activities: {:?}", end_activities);
+    // Add common activities from global sets
+    for activity in filtered_activities {
+        if global_start_activities.contains(activity) {
+            start_activities.insert(activity.clone());
+        }
+        if global_end_activities.contains(activity) {
+            end_activities.insert(activity.clone());
+        }
+    }
 
     (start_activities, end_activities)
 }

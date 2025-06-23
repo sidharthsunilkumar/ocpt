@@ -38,7 +38,7 @@ pub fn find_cuts(
 
             let (filtered_start_activites,filtered_end_activites)=get_start_and_end_activities_v2(&dfg, &combined_activites, start_activities, end_activities);
             
-            info!("Checking cut: {:?} (.....) {:?}", combo_set, complement_set);
+            // info!("Checking cut: {:?} (.....) {:?}", combo_set, complement_set);
 
             let excl_cut = is_exclusive_choice_cut_possible(&filtered_dfg, &combo_set, &complement_set);
             if excl_cut {
@@ -194,9 +194,9 @@ fn is_parallel_cut_possible(
     start_activities: &HashSet<String>,
     end_activities: &HashSet<String>,
 ) -> bool {
-    // info!("Checking parallel cut...");
-    // info!("Start activities: {:?}", start_activities);
-    // info!("End activities: {:?}", end_activities);
+    info!("Checking parallel cut...");
+    info!("Start activities: {:?}", start_activities);
+    info!("End activities: {:?}", end_activities);
 
     // 1. There must be some common activities between set_1_activities and start_activities
     if set_1_activities.is_disjoint(start_activities) {

@@ -18,6 +18,9 @@ use log::info;
 mod cost_to_cut;
 mod good_cuts;
 mod best_sequence_cut;
+mod best_exclusive_cut;
+mod best_parallel_cut;
+mod best_parallel_cut_exhaustive;
 
 //For REST API server
 use tokio::fs as tokiofs;
@@ -75,7 +78,7 @@ fn main() {
         WriteLogger::new(LevelFilter::Info, Config::default(), File::create("process.log").unwrap()),
     ]).unwrap();
 
-    // let file_path = "data/small-example-v7.jsonocel";
+    // let file_path = "data/small-example-v3.jsonocel";
     // let file_path = "data/running-example.jsonocel";
     let file_path = "data/github_pm4py.jsonocel";
 
@@ -121,7 +124,7 @@ fn main() {
     // let process_forest = start_cuts_gem::find_cuts(&dfg, &dfg, all_activities, &start_acts, &end_acts);
     // In case of filtering activities in the begining
     // let process_forest = start_cuts::find_cuts(&filtered_dfg, &filtered_dfg, filtered_activities, &start_acts, &end_acts);
-    let process_forest = start_cuts_opti_v2::find_cuts_start(&filtered_dfg, &filtered_activities);
+    let process_forest = start_cuts_opti_v2::find_cuts_start(&filtered_dfg, &filtered_activities, &start_acts, &end_acts);
 
 
     let elapsed = start_time.elapsed();
