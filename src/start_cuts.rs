@@ -145,7 +145,7 @@ fn filter_keep_dfg(
 }
 
 
-fn is_sequence_cut_possible(
+pub fn is_sequence_cut_possible(
     dfg: &HashMap<(String, String), usize>,
     set_1_activities: &HashSet<String>,
     set_2_activities: &HashSet<String>,
@@ -172,7 +172,7 @@ fn is_sequence_cut_possible(
     true
 }
 
-fn is_exclusive_choice_cut_possible(
+pub fn is_exclusive_choice_cut_possible(
     dfg: &HashMap<(String, String), usize>,
     set_1_activities: &HashSet<String>,
     set_2_activities: &HashSet<String>,
@@ -194,9 +194,9 @@ fn is_parallel_cut_possible(
     start_activities: &HashSet<String>,
     end_activities: &HashSet<String>,
 ) -> bool {
-    info!("Checking parallel cut...");
-    info!("Start activities: {:?}", start_activities);
-    info!("End activities: {:?}", end_activities);
+    // info!("Checking parallel cut...");
+    // info!("Start activities: {:?}", start_activities);
+    // info!("End activities: {:?}", end_activities);
 
     // 1. There must be some common activities between set_1_activities and start_activities
     if set_1_activities.is_disjoint(start_activities) {

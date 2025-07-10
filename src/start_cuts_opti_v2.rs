@@ -1,13 +1,18 @@
 use crate::best_parallel_cut_exhaustive::best_parallel_cut_exhaustive;
+use crate::best_parallel_cut_v2::best_parallel_cut_v2;
+use crate::best_redo_cuts::best_redo_cut;
 use crate::cost_to_cut::to_be_non_reachable;
 use crate::good_cuts::best_possible_sequence_cut;
 use crate::best_sequence_cut::best_sequence_cut;
 use crate::best_exclusive_cut::best_exclusive_cut;
 use crate::best_parallel_cut::best_parallel_cut;
+use crate::start_cuts::{is_exclusive_choice_cut_possible, is_sequence_cut_possible};
 use crate::types::{ProcessForest, TreeNode};
 use itertools::Itertools;
 use log::info;
 use std::collections::{HashMap, HashSet, VecDeque};
+use crate::best_sequence_cut_v2;
+use crate::cost_to_cut::is_reachable;
 
 
 
@@ -31,7 +36,7 @@ pub fn find_cuts_start(
     
 
     let (excl_set1, excl_set2) = find_exclusive_choice_cut(&filtered_dfg, &all_activities);
-    if(!excl_set1.is_empty() && !excl_set2.is_empty()) {
+    if(!excl_set1.is_empty() && !excl_set2.is_empty() && is_exclusive_choice_cut_possible(&filtered_dfg, &excl_set1, &excl_set2)) {
         info!("Exclusive cut found: {:?} (X) {:?}", excl_set1, excl_set2);
         find_cuts_start(&dfg, &excl_set1, &start_activities, &end_activities);
         find_cuts_start(&dfg, &excl_set2, &start_activities, &end_activities); 
@@ -39,7 +44,7 @@ pub fn find_cuts_start(
     } 
 
     let (set1, set2) = find_sequence_cut(&filtered_dfg, &all_activities);
-    if(!set1.is_empty() && !set2.is_empty()) {
+    if(!set1.is_empty() && !set2.is_empty() && is_sequence_cut_possible(&filtered_dfg, &set1, &set2)) {
         info!("Sequence cut found: {:?} (->) {:?}", set1, set2);
         find_cuts_start(&dfg, &set1, &start_activities, &end_activities);
         find_cuts_start(&dfg, &set2, &start_activities, &end_activities);
@@ -66,52 +71,114 @@ pub fn find_cuts_start(
 
     info!("No further cuts found for the current set of activities: {:?}", all_activities);
 
-    // info!("Checking for best possible sequence cut...");
-    // let (bs_min_cost, bs_no_of_cuts, bs_cut_edges, bs_set1, bs_set2, new_dfg) = best_sequence_cut(&filtered_dfg, &all_activities);
-    // info!("\n=== BEST SEQUENCE CUT RESULTS ===");
-    // info!("Minimum Cost: {}", bs_min_cost);
-    // info!("Number of cut edges: {}", bs_no_of_cuts);
-    // info!("Cut Edges: {:?}", bs_cut_edges);
-    // info!("Set 1: {:?}", bs_set1);
-    // info!("Set 2: {:?}", bs_set2);
+    info!("Checking for best possible sequence cut...");
+    let (bs_min_cost, bs_no_of_cuts, bs_cut_edges, bs_no_of_added_edges, bs_added_edges, bs_set1, bs_set2, bs_new_dfg) = best_sequence_cut(&filtered_dfg, &all_activities);
+    info!("\n=== BEST SEQUENCE CUT RESULTS ===");
+    info!("Minimum Cost: {}", bs_min_cost);
+    info!("Number of cut edges: {}", bs_no_of_cuts);
+    info!("Cut Edges: {:?}", bs_cut_edges);
+    info!("Number of added edges: {}", bs_no_of_added_edges);
+    info!("Added Edges: {:?}", bs_added_edges);
+    info!("Set 1: {:?}", bs_set1);
+    info!("Set 2: {:?}", bs_set2);
+    // info!("new dfg: {:?}", bs_new_dfg);
+    let (is_sequence, failures) = sequence_cut_condition_check(&bs_new_dfg, &bs_set1, &bs_set2);
+    if(!is_sequence) {
+        // I dont think this is possible, but just in case
+        // because, for 'a' in set1, and 'b' in set2, we would definitely have a forced sequence cut
+        info!("Sequence cut condition failed for sets: {:?} and {:?}", bs_set1, bs_set2);
+        for (a, b, r1, r2) in failures {
+            info!("Condition failure: {} -> {} (reachable: {}, {})", a, b, r1, r2);
+        }
+    }
 
-    // find_cuts_start(&new_dfg, &bs_set1, &start_activities, &end_activities);
-    // find_cuts_start(&new_dfg, &bs_set2, &start_activities, &end_activities);
+    // find_cuts_start(&bs_new_dfg, &bs_set1, &start_activities, &end_activities);
+    // find_cuts_start(&bs_new_dfg, &bs_set2, &start_activities, &end_activities);
     // return;
 
-    info!("Checking for best possible exclusive cut...");
-    let (be_min_cost, be_no_of_cuts,be_cut_edges, be_set1, be_set2, be_new_dfg) = best_exclusive_cut(&filtered_dfg, &all_activities);
-    info!("\n=== BEST EXCLUSIVE CUT RESULTS ===");
-    info!("Minimum Cost: {}", be_min_cost);
-    info!("Number of cut edges: {}", be_no_of_cuts);
-    info!("Cut Edges: {:?}", be_cut_edges);
-    info!("Set 1: {:?}", be_set1);
-    info!("Set 2: {:?}", be_set2);
+    // info!("Checking for best possible sequence cut V2...");
+    // let (bsv2_min_cost, bsv2_cut_cost, bsv2_add_cost, bsv2_cutedges, bsv2_added_edges, bsv2_set1, bsv2_set2) = optimal_partition(&filtered_dfg, &all_activities);
+    // info!("\n=== BEST SEQUENCE CUT V2 RESULTS ===");
+    // info!("Minimum Cost: {}", bsv2_min_cost);
+    // info!("Cut Cost: {}", bsv2_cut_cost);
+    // info!("Add Cost: {}", bsv2_add_cost);
+    // info!("Cut Edges: {:?}", bsv2_cutedges);
+    // info!("Added Edges: {:?}", bsv2_added_edges);
+    // info!("Set 1: {:?}", bsv2_set1);
+    // info!("Set 2: {:?}", bsv2_set2);
 
-    find_cuts_start(&be_new_dfg, &be_set1, &start_activities, &end_activities);
-    find_cuts_start(&be_new_dfg, &be_set2, &start_activities, &end_activities);
-    return;
+    // info!("Checking for best possible exclusive cut...");
+    // let (be_min_cost, be_cut_edges, be_set1, be_set2, be_new_dfg) = best_exclusive_cut(&dfg, &all_activities);
+    // info!("\n=== BEST EXCLUSIVE CUT RESULTS ===");
+    // info!("Minimum Cost: {}", be_min_cost);
+    // info!("Cut Edges: {:?}", be_cut_edges);
+    // info!("Set 1: {:?}", be_set1);
+    // info!("Set 2: {:?}", be_set2);
+    // let (is_exclusive, be_failures) = exclusive_cut_condition_check(&be_new_dfg, &be_set1, &be_set2);
+    // if(!is_exclusive) {
+    //     // I dont think this is possible, but just in case
+    //     // because, for 'a' in set1, and 'b' in set2, we would definitely have a forced sequence cut
+    //     info!("Exclusive cut condition failed for sets: {:?} and {:?}", be_set1, be_set2);
+    //     for (a, b, r1, r2) in be_failures {
+    //         info!("Condition failure: {} -> {} (reachable: {}, {})", a, b, r1, r2);
+    //     }
+    // }
 
-    // info!("Checking for best possible parallel cut...");
-    // let result = best_parallel_cut(&dfg, &all_activities);    
-    // info!("\n=== BEST PARALLEL CUT RESULTS ===");
-    // info!("Minimum cost: {}", result.minimum_cost);
-    // info!("Number of edges added: {}", result.num_edges_added);
-    // info!("Set1: {:?}", result.set1);
-    // info!("Set2: {:?}", result.set2);
+    // find_cuts_start(&be_new_dfg, &be_set1, &start_activities, &end_activities);
+    // find_cuts_start(&be_new_dfg, &be_set2, &start_activities, &end_activities);
+    // return;
+
+    info!("Checking for best possible parallel cut...");
+    let result = best_parallel_cut(&dfg, &all_activities);    
+    info!("\n=== BEST PARALLEL CUT RESULTS ===");
+    info!("Minimum cost: {}", result.minimum_cost);
+    info!("Number of edges added: {}", result.num_edges_added);
+    info!("Set1: {:?}", result.set1);
+    info!("Set2: {:?}", result.set2);
     // find_cuts_start(&result.new_dfg, &result.set1);
     // find_cuts_start(&result.new_dfg, &result.set2);
     // return;
 
-    // info!("Checking for best possible exhaustive parallel cut...");
-    // let result = best_parallel_cut_exhaustive(&dfg, &all_activities);    
-    // info!("\n=== BEST PARALLEL CUT RESULTS ===");
-    // info!("Minimum cost: {}", result.minimum_cost);
-    // info!("Number of edges added: {}", result.num_edges_added);
-    // info!("Set1: {:?}", result.set1);
-    // info!("Set2: {:?}", result.set2);
-    // info!("Original edges: {}", dfg.len());
-    // info!("New DFG edges: {}", result.new_dfg.len());
+    info!("Checking for best possible exhaustive parallel cut...");
+    let result = best_parallel_cut_exhaustive(&dfg, &all_activities);    
+    info!("\n=== BEST PARALLEL CUT RESULTS ===");
+    info!("Minimum cost: {}", result.minimum_cost);
+    info!("Number of edges added: {}", result.num_edges_added);
+    info!("Set1: {:?}", result.set1);
+    info!("Set2: {:?}", result.set2);
+    info!("Original edges: {}", dfg.len());
+    info!("New DFG edges: {}", result.new_dfg.len());
+
+    info!("Checking for best possible parallel cut vs gemini...");
+    let result = best_parallel_cut_v2(&dfg, &all_activities);   
+    info!("\n=== BEST PARALLEL CUT RESULTS ===");
+    info!("Minimum cost: {}", result.min_cost);
+    info!("Total Number of Edges to Add: {}", result.num_added_edges);
+    info!("Set1: {:?}", result.set1);
+    info!("Set2: {:?}", result.set2);
+    for edge in result.added_edges {
+        info!("  - From '{}' to '{}'", edge.0, edge.1);
+    }
+
+    // info!("Checking for best possible redo cut...");
+    // let (br_is_redo, br_min_cost, br_no_of_cuts,br_cut_edges, br_set1, br_set2, br_new_dfg) = best_redo_cut(&filtered_dfg, &all_activities, &start_activities, &end_activities);
+    // if br_is_redo {
+    //     info!("\n=== BEST REDO CUT RESULTS ===");
+    //     info!("Minimum Cost: {}", br_min_cost);
+    //     info!("Number of cut edges: {}", br_no_of_cuts);
+    //     info!("Cut Edges: {:?}", br_cut_edges);
+    //     info!("Set 1: {:?}", br_set1);
+    //     info!("Set 2: {:?}", br_set2);
+
+    //     // find_cuts_start(&br_new_dfg, &br_set1, &start_activities, &end_activities);
+    //     // find_cuts_start(&br_new_dfg, &br_set2, &start_activities, &end_activities);
+    //     // return;
+    // } else {
+    //     info!("No best redo cut found");
+    // }
+    
+
+    
 
 
 }
@@ -179,6 +246,24 @@ fn find_exclusive_choice_cut(
     // info!("\nSet 1: {:?}", set1);
     // info!("Set 2: {:?}", set2);
     (set1, set2)
+}
+
+fn exclusive_cut_condition_check(
+    dfg: &HashMap<(String, String), usize>,
+    set1: &HashSet<String>,
+    set2: &HashSet<String>,
+) -> (bool, Vec<(String, String, bool, bool)>) {
+    let mut failures = Vec::new();
+    for a in set1 {
+        for b in set2 {
+            let r1 = is_reachable(dfg, a, b);
+            let r2 = is_reachable(dfg, b, a);
+            if (r1 || r2) {
+                failures.push((a.clone(), b.clone(), r1, r2));
+            }
+        }
+    }
+    (failures.is_empty(), failures)
 }
 
 // ------- Sequence cut and helpers ------------
@@ -400,6 +485,24 @@ pub fn is_reachable_in_dag(
         }
     }
     false
+}
+
+fn sequence_cut_condition_check(
+    dfg: &HashMap<(String, String), usize>,
+    set1: &HashSet<String>,
+    set2: &HashSet<String>,
+) -> (bool, Vec<(String, String, bool, bool)>) {
+    let mut failures = Vec::new();
+    for a in set1 {
+        for b in set2 {
+            let r1 = is_reachable(dfg, a, b);
+            let r2 = is_reachable(dfg, b, a);
+            if !(r1 && !r2) {
+                failures.push((a.clone(), b.clone(), r1, r2));
+            }
+        }
+    }
+    (failures.is_empty(), failures)
 }
 
 // --------------------- Parallel cut and helpers ---------------------
@@ -634,7 +737,7 @@ fn get_start_and_end_activities(
     (start_activities, end_activities)
 }
 
-fn is_reachable_before_end_activity(
+pub fn is_reachable_before_end_activity(
     start_activities: &HashSet<String>,
     target: &String,
     end_activities: &HashSet<String>,

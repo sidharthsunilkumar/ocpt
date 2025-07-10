@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use crate::cost_to_add::add_edge_to_dfg;
 use crate::cost_to_cut::is_reachable;
 use crate::cost_to_cut::to_be_non_reachable;
 use log::info;
@@ -6,10 +7,12 @@ use log::info;
 pub fn best_sequence_cut(
     dfg: &HashMap<(String, String), usize>, 
     all_activities: &HashSet<String>
-) -> (usize, usize, Vec<(String, String)>, HashSet<String>, HashSet<String>, HashMap<(String, String), usize>) {
+) -> (usize, usize, Vec<(String, String)>, usize, Vec<(String, String)>, HashSet<String>, HashSet<String>, HashMap<(String, String), usize>) {
     let mut min_cost = usize::MAX;
-    let mut best_min_cut = 0;
+    let mut best_no_of_cut_edges = 0;
     let mut best_cut_edges: Vec<(String, String)> = Vec::new();
+    let mut best_no_of_added_edges = 0;
+    let mut best_added_edges: Vec<(String, String)> = Vec::new();
     let mut best_set1: HashSet<String> = HashSet::new();
     let mut best_set2: HashSet<String> = HashSet::new();
     let mut best_size_diff = usize::MAX;
@@ -68,7 +71,25 @@ pub fn best_sequence_cut(
                         set2.insert(activity.clone());
                     }
                 }
-                
+
+                let mut total_cost = cost;
+                let mut added_edges: Vec<(String, String)> = Vec::new();
+                let mut no_of_added_edges = 0;
+
+                // Adding necessary edges
+                for s1 in &set1 {
+                    for s2 in &set2 {
+                        if !is_reachable(&new_dfg, s1, s2) {
+                            // Add edge and update cost
+                            let (updated_dfg, add_cost) = add_edge_to_dfg(&new_dfg, s1, s2);
+                            new_dfg = updated_dfg;
+                            total_cost += add_cost;
+                            added_edges.push((s1.clone(), s2.clone()));
+                            no_of_added_edges += 1;
+                        }
+                    }
+                }
+
                 // print the sets
                 // println!("Set1: {:?}", set1);
                 // println!("Set2: {:?}", set2);
@@ -76,9 +97,9 @@ pub fn best_sequence_cut(
                 let size_diff = (set1.len() as isize - set2.len() as isize).abs() as usize;
                 
                 // Update best solution if this one is better
-                let should_update = if cost < min_cost {
+                let should_update = if total_cost < min_cost {
                     true
-                } else if cost == min_cost {
+                } else if total_cost == min_cost {
                     if size_diff < best_size_diff {
                         true
                     } else {
@@ -89,9 +110,11 @@ pub fn best_sequence_cut(
                 };
                 
                 if should_update {
-                    min_cost = cost;
-                    best_min_cut = min_cut;
+                    min_cost = total_cost;
+                    best_no_of_cut_edges = min_cut;
                     best_cut_edges = cut_edges;
+                    best_no_of_added_edges = no_of_added_edges;
+                    best_added_edges = added_edges;
                     best_set1 = set1;
                     best_set2 = set2;
                     best_size_diff = size_diff;
@@ -104,5 +127,5 @@ pub fn best_sequence_cut(
     }
     
     
-    (min_cost, best_min_cut, best_cut_edges, best_set1, best_set2, best_new_dfg)
+    (min_cost, best_no_of_cut_edges, best_cut_edges, best_no_of_added_edges, best_added_edges, best_set1, best_set2, best_new_dfg)
 }

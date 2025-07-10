@@ -39,19 +39,34 @@ Redo cut----
 How the best cut with minimum cost algo works--------------------------
 
 Sequence cut----
-1. For every pair of activities (a,b), find the total cost(edges to be removed) in order to make 'a' non-reachable to 'b'.
-2. In each case, create a new dfg with those edges removed. Put 'b' in set1 and 'a' in set2.
-3. For every remaining activity 'c', if 'c' is reachable to 'b', put it in set1.
+
+1. For every pair of activities (a,b), find the total cost(edges to be removed) in order to make 'b' non-reachable to 'a'.
+2. In each case, create a new dfg with those edges removed. Put 'a' in set1 and 'b' in set2.
+3. For every remaining activity 'c', if 'c' is reachable to 'a', put it in set1.
 4. Else, put 'c' in set2.
 5. Also, keep track of the size difference of the final set1 and set2. We want it as balanced as possible.
 6. Take the case with the minimum total cost. If multiple cases have same total cost, then take the one with least size difference.
 7. Return the best cost, edges to be cut, set1, set2, and the new dfg.
 
+v2----
+1. For every pair of activities (a,b), find the total cost(edges to be removed) in order to make 'b' non-reachable to 'a', plus cost(edges to be added) to make 'a' reachable to 'b'.
+2. In each case, create a new dfg with the necessary edges removed and added. Put 'a' in set1 and 'b' in set2.
+3. For every remaining activity 'c', find cost of putting 'c' in set1 and set2, and take the lower cost option.
+3.1 Cost should be calculated like this-
+3.2. Cost1 = cost of edges to be removed to make set2 activities non-reachable to 'c' + cost of edges to be added to make 'c' reachable to every activity in set2.
+3.3. Cost2 = cost of edges to be added to make every activity in set1 reachable to 'c'.
+3.4 if cost1 is lower, put 'c' in set1. Else put 'c' in set2.
+4. Also, keep track of the size difference of the final set1 and set2. We want it as balanced as possible.
+5. Take the case with the minimum total cost. If multiple cases have same total cost, then take the one with least size difference.
+6. Return the best cost, edges to be cut, set1, set2, and the new dfg.
+
 Exclusive cut----
 1. For every pair of activities (a,b), find the total cost(edges to be removed) in order to make 'a' non-reachable to 'b' and 'b' non-reachable to 'a'.
 2. In each case, create a new dfg with those edges removed. Put 'a' in set1 and 'b' in set2.
-3. For every remaining activity 'c', find the reachability of 'c' with 'a' and 'b'.
-4. Based of above, put 'c' in set1 or set1. In some cases, more edges will need to be deleted.
+3. For every remaining activity 'c', find the reachability of 'c' with activities of set1 and set2.
+4. Based of above, put 'c' in set1 or set2 in case atleast 1 set is completely unreachable.
+5. In case, both sets are reachable, find the cost c1 of making 'c' unreachable to and from activities of set1. Find the cost c2 of making 'c' unreachable to and from activities of set2.
+6. Put 'c' in set2 if c1<c2. Else put it in set2.
 5. Also, keep track of the size difference of the final set1 and set2. We want it as balanced as possible.
 6. Take the case with the minimum total cost. If multiple cases have same total cost, then take the one with least size difference.
 7. Return the best cost, edges to be cut, set1, set2, and the new dfg.
@@ -123,34 +138,76 @@ For every pair of activity(a,b){
 }
 
 Parallel cut----
-Complete Step-by-Step Heuristic Method for 30 Nodes
-Here's the detailed breakdown of how the heuristic works:
-STEP 1: Multiple Random Restarts (Diversification)
+Heuristic Method---
+1. Randomly divide activities into two sets: set1 and set2.
+2. For each partition, calculate the cost to make it parallel i.e. adding edges. Also, which edges need to be added.
+3. Iteratively try moving one activity from one set to the other. Accept a move only if it reduces the cost. Repeat until no more improvements can be found.
+4. Do same as above, but with small sets of activities instead of one. 
+5. Do this random division many times, and keep track of the best result.
 
-Why: With 2³⁰ possible partitions, we need multiple starting points
-How: Try 50 different random initial partitions
-Goal: Explore different regions of the solution space
+Exhaustive Method-
+1. Make all possible partitions of activities into 2 sets.
+2. In each case, see the cost to make it as a valid parallel cut.
+3. Keep track of the best.
 
-STEP 2: Generate Smart Initial Partitions
 
-Avoid extreme imbalance: Don't put all 29 activities in one set and 1 in another
-Rule: Each set should have at least 25% of total activities (7-8 minimum)
-Method: Randomly select 7-23 activities for Set1, rest go to Set2
+REDO CUT----
+1. For all start activities 's' and end activities 'e', check if 'e' is reachable from 's'. If not, return false i.e. redo cut is not possible.
+2. Make a list with start-to-end activity pairs and end-to-start activity pairs.
+3. Put all start and end activities in set1.
+4. For each remaining activity, see if it occurs in between start-to-end pairs or between end-to-start pairs.
+5. If only 1st case is true, put it in set1. If only 2nd case is true, put it in set2.
+6. In case, both are true, do below.
+7. First delete the activity and check if all the start-to-end activity pairs and end-to-start activity pairs are still valid. If not, return false.
+8. If any start-to-end activity pair is invalid but end-to-start pairs are valid, then add it to set1. 
+9. If any end-to-start activity pair is invalid but start-to-end pairs are valid, then add it to set2. 
+10. Else, find the cost of removing all edges of it from activities in set1 and set2, see which is lower, and do that.
 
-STEP 3: Local Search Improvement (Hill Climbing)
-For each initial partition:
+v2-
+1. For all start activities 's' and end activities 'e', check if 's' is reachable from 'e'. If not, return false i.e. redo cut is not possible.
+2. Put all start and end activities in set1.
+4. For each remaining activity, see if it occurs in between start and end activities or between end and start activities.
+5. If only 1st case is true, put it in set1. If only 2nd case is true, put it in set2.
+6. In case, both are true, do below.
+7. First delete the activity and check if all the start-to-end activity reachability and end-to-start activity reachability are still valid. If not, return false.
+8. If any start-to-end activity reachability is invalid but end-to-start reachability are valid, then add it to set1. 
+9. If any end-to-start activity reachability is invalid but start-to-end pairs are reachability, then add it to set2. 
+10. Else, find the cost of removing all edges of it from activities in set1 and set2, see which is lower, and do that.
 
-Try moving each activity to the other set
-Calculate cost change for each possible move
-Apply the best move that reduces cost
-Repeat until no improvement is possible
 
-STEP 4: Cost Calculation (The Core Logic)
-For any partition (Set1, Set2):
-Required edges = |Set1| × |Set2| × 2  (bidirectional)
-Cost = Required edges - Existing cross-partition edges
-STEP 5: Advanced Optimization Techniques
 
-Activity Swaps: Try swapping pairs of activities between sets
-Balance Optimization: If sets are very imbalanced, try rebalancing
-2-opt Style Moves: More sophisticated neighborhood exploration
+
+
+Possible names-
+1. User-guided cut recommendations for complex Object-Centric event logs.
+2. Process model discovery through Cut effort estimation in Object-Centric event Logs.
+3. Improving cut detection in Object-Centric Process Discovery.
+4. Smart Cut suggestions in Object-Centric Process Discovery.
+5. A Framework for dealing with inseparable activities in Object-Centric event logs.
+6. Interactive Cut evaluation in highly connected Object-Centric event logs.
+
+visual, object centric, , guided, process discovery, 
+
+
+
+
+-------------------------------------
+Proof for optimal guaratee of sequence cut.
+
+Important note-
+The rule for sequence cut is for activity 'a' in set1 and for every activity 'b' in set2, 'a' should be able to reach 'b', and 'b' cannot not reach 'a'.
+This algorithm only checks the unreachability part of the rule i.e. "'b' cannot not reach 'a'" part. If the reachability part was false in some case, there would be a sequence cut with 0 cost.
+This is why this algorithm ignores this checking reachability step.
+
+Now coming to the proof.
+
+Let's assume there is an optimal division of activities set1= (...,a,....) & set2=(...,b,...) with cost=m which gives the optimal sequence cut.
+We know that in our algorithm, we definitely consider a case starting with set1=(a) and set2=(b) cost=n at this stage. The cost does not increase when assigning the remaining activities.
+In the optimal case, as 'a' must be unreachable from 'b', then the cost 'm' >='n'.
+So, the minimum cost to divide the 2 sets by a sequence cut must be 'n'.
+If you are assigning a remaining activity 'c' to set1 as 'c' can reach 'a', the other activities in set2 are guaranteed to be unreachable to 'c' as that would mean, it can also reach 'a' and thats not possible.
+If you are assigning a remaining activity 'c' to set2 as 'c' cannot reach 'a', 'a' must to reachable to 'c'. If this is false, it would mean a sequence cut with cost=0 is possible.
+So the sequence rules are not being violated.
+
+
+

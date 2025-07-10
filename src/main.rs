@@ -16,11 +16,15 @@ mod start_cuts_opti_v2;
 mod format_conversion;
 use log::info;
 mod cost_to_cut;
+mod cost_to_add;
 mod good_cuts;
 mod best_sequence_cut;
 mod best_exclusive_cut;
 mod best_parallel_cut;
 mod best_parallel_cut_exhaustive;
+mod best_redo_cuts;
+mod best_sequence_cut_v2;
+mod best_parallel_cut_v2;
 
 //For REST API server
 use tokio::fs as tokiofs;
@@ -78,9 +82,10 @@ fn main() {
         WriteLogger::new(LevelFilter::Info, Config::default(), File::create("process.log").unwrap()),
     ]).unwrap();
 
-    // let file_path = "data/small-example-v3.jsonocel";
+    // let file_path = "data/small-example-v4.jsonocel";
     // let file_path = "data/running-example.jsonocel";
     let file_path = "data/github_pm4py.jsonocel";
+    // let file_path = "data/o2c.jsonocel";
 
     let file_content = stdfs::read_to_string(&file_path).unwrap();
     let ocel: OcelJson = serde_json::from_str(&file_content).unwrap();
@@ -113,10 +118,15 @@ fn main() {
     let filtered_dfg = filter_dfg(&dfg, &remove_list);
     let filtered_activities = filter_activities(&all_activities, &remove_list);
 
+    let temp = cost_to_add::all_possible_edges_to_add_to_dfg(&filtered_dfg, &filtered_activities);
+    for (edge, cost) in &temp {
+        info!("Edge: {:?} with cost: {}", edge, cost);
+    }
+
     // let json_dfg = format_conversion::dfg_to_json(&dfg);
     // let json_string = serde_json::to_string_pretty(&json_dfg).unwrap();
     // // Save to file
-    // let mut file = File::create("dfs-diagrams/dfg_github_pm4py.json").expect("Failed to create file");
+    // let mut file = File::create("dfs-diagrams/dfg_o2c.json").expect("Failed to create file");
     // file.write_all(json_string.as_bytes()).expect("Failed to write to file");
 
     let start_time = std::time::Instant::now();
@@ -124,7 +134,7 @@ fn main() {
     // let process_forest = start_cuts_gem::find_cuts(&dfg, &dfg, all_activities, &start_acts, &end_acts);
     // In case of filtering activities in the begining
     // let process_forest = start_cuts::find_cuts(&filtered_dfg, &filtered_dfg, filtered_activities, &start_acts, &end_acts);
-    let process_forest = start_cuts_opti_v2::find_cuts_start(&filtered_dfg, &filtered_activities, &start_acts, &end_acts);
+    // let process_forest = start_cuts_opti_v2::find_cuts_start(&filtered_dfg, &filtered_activities, &start_acts, &end_acts);
 
 
     let elapsed = start_time.elapsed();
@@ -236,4 +246,47 @@ fn get_start_and_end_activities_from_dfg(
     }
 
     (start_activities, end_activities)
+}
+
+fn mainkoi() {
+
+    println!("Starting example...");
+    CombinedLogger::init(vec![
+        TermLogger::new(LevelFilter::Info, Config::default(), TerminalMode::Mixed, ColorChoice::Auto),
+        WriteLogger::new(LevelFilter::Info, Config::default(), File::create("process.log").unwrap()),
+    ]).unwrap();
+
+    // Example with 4 nodes: A, B, C, D
+    let mut dfg: HashMap<(String, String), usize> = HashMap::new();
+    dfg.insert(("A".to_string(), "D".to_string()), 1);
+    dfg.insert(("C".to_string(), "B".to_string()), 1);
+    dfg.insert(("C".to_string(), "D".to_string()), 1);
+    
+
+    let all_activities: HashSet<String> = ["A", "B", "C", "D"]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+
+    let start_acts: HashSet<String>= ["A", "C"]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+
+    let end_acts: HashSet<String>= ["B", "D"]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+
+    // start_cuts::find_cuts(&dfg, &dfg, all_activities, &start_acts, &end_acts);
+    start_cuts_opti_v2::find_cuts_start(&dfg, &all_activities, &start_acts, &end_acts);
+
+    // let (min_cost, cut_edges, set1, set2, new_dfg) = best_exclusive_cut::best_exclusive_cut(&dfg, &all_activities);
+
+    // info!("== Best Exclusive Cut Result ===");
+    // info!("Min cost: {}", min_cost);
+    // info!("Cut edges: {:?}", cut_edges);
+    // info!("Set 1: {:?}", set1);
+    // info!("Set 2: {:?}", set2);
+    // info!("New DFG: {:?}", new_dfg);
 }
