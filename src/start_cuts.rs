@@ -44,7 +44,7 @@ pub fn find_cuts(
             if excl_cut {
                 info!("Excl parallel cut found: {:?} (X) {:?}", combo_set, complement_set);
                 let mut node = TreeNode {
-                    label: "excl".to_string(),
+                    label: "exclusive".to_string(),
                     children: Vec::new(),
                 };
                 node.children.extend(find_cuts(&dfg, &filtered_dfg, combo_set, &start_activities, &end_activities));
@@ -57,7 +57,7 @@ pub fn find_cuts(
             if seq_cut {
                 info!("Seq parallel cut found: {:?} (->) {:?}", combo_set, complement_set);
                 let mut node = TreeNode {
-                    label: "seq".to_string(),
+                    label: "sequence".to_string(),
                     children: Vec::new(),
                 };
                 node.children.extend(find_cuts(&dfg, &filtered_dfg, combo_set, &start_activities, &end_activities));
@@ -70,7 +70,7 @@ pub fn find_cuts(
             if para_cut {
                 info!("Parallel cut found: {:?} (||) {:?}", combo_set, complement_set);
                 let mut node = TreeNode {
-                    label: "para".to_string(),
+                    label: "parallel".to_string(),
                     children: Vec::new(),
                 };
                 node.children.extend(find_cuts(&dfg, &filtered_dfg, combo_set, &start_activities, &end_activities));

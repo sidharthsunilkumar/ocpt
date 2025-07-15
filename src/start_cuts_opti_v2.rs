@@ -1,96 +1,216 @@
+use crate::best_exclusive_cut::best_exclusive_cut;
+use crate::best_parallel_cut::best_parallel_cut;
 use crate::best_parallel_cut_exhaustive::best_parallel_cut_exhaustive;
 use crate::best_parallel_cut_v2::best_parallel_cut_v2;
 use crate::best_redo_cuts::best_redo_cut;
+use crate::best_sequence_cut::best_sequence_cut;
+use crate::best_sequence_cut_v2;
+use crate::cost_to_cut::is_reachable;
 use crate::cost_to_cut::to_be_non_reachable;
 use crate::good_cuts::best_possible_sequence_cut;
-use crate::best_sequence_cut::best_sequence_cut;
-use crate::best_exclusive_cut::best_exclusive_cut;
-use crate::best_parallel_cut::best_parallel_cut;
 use crate::start_cuts::{is_exclusive_choice_cut_possible, is_sequence_cut_possible};
+use crate::types::CutSuggestion;
+use crate::types::CutSuggestionsList;
 use crate::types::{ProcessForest, TreeNode};
 use itertools::Itertools;
 use log::info;
 use std::collections::{HashMap, HashSet, VecDeque};
-use crate::best_sequence_cut_v2;
-use crate::cost_to_cut::is_reachable;
-
-
 
 pub fn find_cuts_start(
-    dfg: &HashMap<(String, String), usize>, 
+    dfg: &HashMap<(String, String), usize>,
     all_activities: &HashSet<String>,
     start_activities: &HashSet<String>,
-    end_activities: &HashSet<String>) {
+    end_activities: &HashSet<String>,
+) -> ProcessForest {
+    let mut forest = Vec::new();
 
-    if all_activities.len() <= 1 {
-        return;
+    let activities: Vec<String> = all_activities.clone().into_iter().collect();
+    let n = activities.len();
+
+    if n == 1 {
+        // Base case: single activity, create a leaf node
+        let node = TreeNode {
+            label: activities[0].clone(),
+            children: Vec::new(),
+        };
+        forest.push(node);
+        return forest;
     }
 
-
     let filtered_dfg = filter_keep_dfg(&dfg, &all_activities);
-    let (start_activities, end_activities) = get_start_and_end_activities(&dfg, &all_activities, &start_activities, &end_activities);
-
+    let (start_activities, end_activities) =
+        get_start_and_end_activities(&dfg, &all_activities, &start_activities, &end_activities);
 
     // ----- perform cuts--------
 
-    
-
     let (excl_set1, excl_set2) = find_exclusive_choice_cut(&filtered_dfg, &all_activities);
-    if(!excl_set1.is_empty() && !excl_set2.is_empty() && is_exclusive_choice_cut_possible(&filtered_dfg, &excl_set1, &excl_set2)) {
+    if (!excl_set1.is_empty()
+        && !excl_set2.is_empty()
+        && is_exclusive_choice_cut_possible(&filtered_dfg, &excl_set1, &excl_set2))
+    {
         info!("Exclusive cut found: {:?} (X) {:?}", excl_set1, excl_set2);
-        find_cuts_start(&dfg, &excl_set1, &start_activities, &end_activities);
-        find_cuts_start(&dfg, &excl_set2, &start_activities, &end_activities); 
-        return; 
-    } 
+        let mut node = TreeNode {
+            label: "exclusive".to_string(),
+            children: Vec::new(),
+        };
+        node.children.extend(find_cuts_start(
+            &dfg,
+            &excl_set1,
+            &start_activities,
+            &end_activities,
+        ));
+        node.children.extend(find_cuts_start(
+            &dfg,
+            &excl_set2,
+            &start_activities,
+            &end_activities,
+        ));
+        forest.push(node);
+        return forest;
+    }
 
     let (set1, set2) = find_sequence_cut(&filtered_dfg, &all_activities);
-    if(!set1.is_empty() && !set2.is_empty() && is_sequence_cut_possible(&filtered_dfg, &set1, &set2)) {
+    if (!set1.is_empty()
+        && !set2.is_empty()
+        && is_sequence_cut_possible(&filtered_dfg, &set1, &set2))
+    {
         info!("Sequence cut found: {:?} (->) {:?}", set1, set2);
-        find_cuts_start(&dfg, &set1, &start_activities, &end_activities);
-        find_cuts_start(&dfg, &set2, &start_activities, &end_activities);
-        return;
+        let mut node = TreeNode {
+            label: "sequence".to_string(),
+            children: Vec::new(),
+        };
+        node.children.extend(find_cuts_start(
+            &dfg,
+            &set1,
+            &start_activities,
+            &end_activities,
+        ));
+        node.children.extend(find_cuts_start(
+            &dfg,
+            &set2,
+            &start_activities,
+            &end_activities,
+        ));
+        forest.push(node);
+        return forest;
     }
-
-       
 
     let (is_parallel, para_set1, para_set2) = find_parallel_cut(&filtered_dfg, &all_activities);
-    if(is_parallel && !para_set1.is_empty() && !para_set2.is_empty() && parallel_cut_condition_check(&para_set1, &para_set2, &start_activities, &end_activities)) {
+    if (is_parallel
+        && !para_set1.is_empty()
+        && !para_set2.is_empty()
+        && parallel_cut_condition_check(&para_set1, &para_set2, &start_activities, &end_activities))
+    {
         info!("Parallel cut found: {:?} (||) {:?}", para_set1, para_set2);
-        find_cuts_start(&dfg, &para_set1, &start_activities, &end_activities);
-        find_cuts_start(&dfg, &para_set2, &start_activities, &end_activities);  
-        return;
-    } 
+        let mut node = TreeNode {
+            label: "parallel".to_string(),
+            children: Vec::new(),
+        };
+        node.children.extend(find_cuts_start(
+            &dfg,
+            &para_set1,
+            &start_activities,
+            &end_activities,
+        ));
+        node.children.extend(find_cuts_start(
+            &dfg,
+            &para_set2,
+            &start_activities,
+            &end_activities,
+        ));
+        forest.push(node);
+        return forest;
+    }
 
-    let (is_redo, redo_set1, redo_set2) = find_redo_cut(&filtered_dfg, &all_activities, &start_activities, &end_activities);
-    if (is_redo && !redo_set2.is_empty() && !redo_set1.is_empty() && redo_cut_condition_check(&filtered_dfg, &redo_set1, &redo_set2, &start_activities, &end_activities)) {
+    let (is_redo, redo_set1, redo_set2) = find_redo_cut(
+        &filtered_dfg,
+        &all_activities,
+        &start_activities,
+        &end_activities,
+    );
+    if (is_redo
+        && !redo_set2.is_empty()
+        && !redo_set1.is_empty()
+        && redo_cut_condition_check(
+            &filtered_dfg,
+            &redo_set1,
+            &redo_set2,
+            &start_activities,
+            &end_activities,
+        ))
+    {
         info!("Redo cut found: {:?} (R) {:?}", redo_set1, redo_set2);
-        find_cuts_start(&dfg, &redo_set1, &start_activities, &end_activities);
-        find_cuts_start(&dfg, &redo_set2, &start_activities, &end_activities); 
-        return; 
+        let mut node = TreeNode {
+            label: "redo".to_string(),
+            children: Vec::new(),
+        };
+        node.children.extend(find_cuts_start(
+            &dfg,
+            &redo_set1,
+            &start_activities,
+            &end_activities,
+        ));
+        node.children.extend(find_cuts_start(
+            &dfg,
+            &redo_set2,
+            &start_activities,
+            &end_activities,
+        ));
+        forest.push(node);
+        return forest;
     }
 
-    info!("No further cuts found for the current set of activities: {:?}", all_activities);
+    info!(
+        "No further cuts found for the current set of activities: {:?}",
+        all_activities
+    );
 
-    info!("Checking for best possible sequence cut...");
-    let (bs_min_cost, bs_no_of_cuts, bs_cut_edges, bs_no_of_added_edges, bs_added_edges, bs_set1, bs_set2, bs_new_dfg) = best_sequence_cut(&filtered_dfg, &all_activities);
-    info!("\n=== BEST SEQUENCE CUT RESULTS ===");
-    info!("Minimum Cost: {}", bs_min_cost);
-    info!("Number of cut edges: {}", bs_no_of_cuts);
-    info!("Cut Edges: {:?}", bs_cut_edges);
-    info!("Number of added edges: {}", bs_no_of_added_edges);
-    info!("Added Edges: {:?}", bs_added_edges);
-    info!("Set 1: {:?}", bs_set1);
-    info!("Set 2: {:?}", bs_set2);
-    // info!("new dfg: {:?}", bs_new_dfg);
-    let (is_sequence, failures) = sequence_cut_condition_check(&bs_new_dfg, &bs_set1, &bs_set2);
-    if(!is_sequence) {
-        // I dont think this is possible, but just in case
-        // because, for 'a' in set1, and 'b' in set2, we would definitely have a forced sequence cut
-        info!("Sequence cut condition failed for sets: {:?} and {:?}", bs_set1, bs_set2);
-        for (a, b, r1, r2) in failures {
-            info!("Condition failure: {} -> {} (reachable: {}, {})", a, b, r1, r2);
-        }
+    // If no valid cuts are found, return disjoint trees
+    for activity in activities {
+        let node = TreeNode {
+            label: activity,
+            children: Vec::new(),
+        };
+        forest.push(node);
     }
+
+    return forest;
+
+    // info!("Checking for best possible sequence cut...");
+    // let (
+    //     bs_min_cost,
+    //     bs_no_of_cuts,
+    //     bs_cut_edges,
+    //     bs_no_of_added_edges,
+    //     bs_added_edges,
+    //     bs_set1,
+    //     bs_set2,
+    //     bs_new_dfg,
+    // ) = best_sequence_cut(&filtered_dfg, &all_activities);
+    // info!("\n=== BEST SEQUENCE CUT RESULTS ===");
+    // info!("Minimum Cost: {}", bs_min_cost);
+    // info!("Number of cut edges: {}", bs_no_of_cuts);
+    // info!("Cut Edges: {:?}", bs_cut_edges);
+    // info!("Number of added edges: {}", bs_no_of_added_edges);
+    // info!("Added Edges: {:?}", bs_added_edges);
+    // info!("Set 1: {:?}", bs_set1);
+    // info!("Set 2: {:?}", bs_set2);
+    // // info!("new dfg: {:?}", bs_new_dfg);
+    // let (is_sequence, failures) = sequence_cut_condition_check(&bs_new_dfg, &bs_set1, &bs_set2);
+    // if (!is_sequence) {
+    //     // I dont think this is possible, but just in case
+    //     // because, for 'a' in set1, and 'b' in set2, we would definitely have a forced sequence cut
+    //     info!(
+    //         "Sequence cut condition failed for sets: {:?} and {:?}",
+    //         bs_set1, bs_set2
+    //     );
+    //     for (a, b, r1, r2) in failures {
+    //         info!(
+    //             "Condition failure: {} -> {} (reachable: {}, {})",
+    //             a, b, r1, r2
+    //         );
+    //     }
+    // }
 
     // find_cuts_start(&bs_new_dfg, &bs_set1, &start_activities, &end_activities);
     // find_cuts_start(&bs_new_dfg, &bs_set2, &start_activities, &end_activities);
@@ -128,37 +248,37 @@ pub fn find_cuts_start(
     // find_cuts_start(&be_new_dfg, &be_set2, &start_activities, &end_activities);
     // return;
 
-    info!("Checking for best possible parallel cut...");
-    let result = best_parallel_cut(&dfg, &all_activities);    
-    info!("\n=== BEST PARALLEL CUT RESULTS ===");
-    info!("Minimum cost: {}", result.minimum_cost);
-    info!("Number of edges added: {}", result.num_edges_added);
-    info!("Set1: {:?}", result.set1);
-    info!("Set2: {:?}", result.set2);
+    // info!("Checking for best possible parallel cut...");
+    // let result = best_parallel_cut(&dfg, &all_activities);
+    // info!("\n=== BEST PARALLEL CUT RESULTS ===");
+    // info!("Minimum cost: {}", result.minimum_cost);
+    // info!("Number of edges added: {}", result.num_edges_added);
+    // info!("Set1: {:?}", result.set1);
+    // info!("Set2: {:?}", result.set2);
     // find_cuts_start(&result.new_dfg, &result.set1);
     // find_cuts_start(&result.new_dfg, &result.set2);
     // return;
 
-    info!("Checking for best possible exhaustive parallel cut...");
-    let result = best_parallel_cut_exhaustive(&dfg, &all_activities);    
-    info!("\n=== BEST PARALLEL CUT RESULTS ===");
-    info!("Minimum cost: {}", result.minimum_cost);
-    info!("Number of edges added: {}", result.num_edges_added);
-    info!("Set1: {:?}", result.set1);
-    info!("Set2: {:?}", result.set2);
-    info!("Original edges: {}", dfg.len());
-    info!("New DFG edges: {}", result.new_dfg.len());
+    // info!("Checking for best possible exhaustive parallel cut...");
+    // let result = best_parallel_cut_exhaustive(&dfg, &all_activities);
+    // info!("\n=== BEST PARALLEL CUT RESULTS ===");
+    // info!("Minimum cost: {}", result.minimum_cost);
+    // info!("Number of edges added: {}", result.num_edges_added);
+    // info!("Set1: {:?}", result.set1);
+    // info!("Set2: {:?}", result.set2);
+    // info!("Original edges: {}", dfg.len());
+    // info!("New DFG edges: {}", result.new_dfg.len());
 
-    info!("Checking for best possible parallel cut vs gemini...");
-    let result = best_parallel_cut_v2(&dfg, &all_activities);   
-    info!("\n=== BEST PARALLEL CUT RESULTS ===");
-    info!("Minimum cost: {}", result.min_cost);
-    info!("Total Number of Edges to Add: {}", result.num_added_edges);
-    info!("Set1: {:?}", result.set1);
-    info!("Set2: {:?}", result.set2);
-    for edge in result.added_edges {
-        info!("  - From '{}' to '{}'", edge.0, edge.1);
-    }
+    // info!("Checking for best possible parallel cut vs gemini...");
+    // let result = best_parallel_cut_v2(&dfg, &all_activities);
+    // info!("\n=== BEST PARALLEL CUT RESULTS ===");
+    // info!("Minimum cost: {}", result.min_cost);
+    // info!("Total Number of Edges to Add: {}", result.num_added_edges);
+    // info!("Set1: {:?}", result.set1);
+    // info!("Set2: {:?}", result.set2);
+    // for edge in result.added_edges {
+    //     info!("  - From '{}' to '{}'", edge.0, edge.1);
+    // }
 
     // info!("Checking for best possible redo cut...");
     // let (br_is_redo, br_min_cost, br_no_of_cuts,br_cut_edges, br_set1, br_set2, br_new_dfg) = best_redo_cut(&filtered_dfg, &all_activities, &start_activities, &end_activities);
@@ -176,11 +296,100 @@ pub fn find_cuts_start(
     // } else {
     //     info!("No best redo cut found");
     // }
+}
+
+pub fn find_best_possible_cuts(
+    dfg: &HashMap<(String, String), usize>,
+    all_activities: &HashSet<String>,
+    start_activities: &HashSet<String>,
+    end_activities: &HashSet<String>,
+) -> CutSuggestionsList{
+    let filtered_dfg = filter_keep_dfg(&dfg, &all_activities);
+    let (start_activities, end_activities) =
+        get_start_and_end_activities(&dfg, &all_activities, &start_activities, &end_activities);
+
+    info!(
+        "Best the best possible cuts for set of activities: {:?}",
+        all_activities
+    );
+
+    let mut cuts: Vec<CutSuggestion> = Vec::new();
+
+    let mut cost_to_add_edge: usize = 1;
+
+    info!("Checking for best possible sequence cut...");
+    let (
+        bs_min_cost,
+        bs_no_of_cuts,
+        bs_cut_edges,
+        bs_no_of_added_edges,
+        bs_added_edges,
+        bs_set1,
+        bs_set2,
+        bs_new_dfg,
+    ) = best_sequence_cut(&filtered_dfg, &all_activities);
+    info!("\n=== BEST SEQUENCE CUT RESULTS ===");
+    info!("Minimum Cost: {}", bs_min_cost);
+    info!("Number of cut edges: {}", bs_no_of_cuts);
+    info!("Cut Edges: {:?}", bs_cut_edges);
+    info!("Number of added edges: {}", bs_no_of_added_edges);
+    info!("Added Edges: {:?}", bs_added_edges);
+    info!("Set 1: {:?}", bs_set1);
+    info!("Set 2: {:?}", bs_set2);
+    // info!("new dfg: {:?}", bs_new_dfg);
+    let (is_sequence, failures) = sequence_cut_condition_check(&bs_new_dfg, &bs_set1, &bs_set2);
+    if (!is_sequence) {
+        // I dont think this is possible, but just in case
+        // because, for 'a' in set1, and 'b' in set2, we would definitely have a forced sequence cut
+        info!(
+            "Sequence cut condition failed for sets: {:?} and {:?}",
+            bs_set1, bs_set2
+        );
+        for (a, b, r1, r2) in failures {
+            info!(
+                "Condition failure: {} -> {} (reachable: {}, {})",
+                a, b, r1, r2
+            );
+        }
+    }
+    // Add sequence cut suggestion
+    cuts.push(CutSuggestion {
+        cut_type: "sequence".to_string(),
+        set1: bs_set1,
+        set2: bs_set2,
+        edges_to_be_added: bs_added_edges,
+        edges_to_be_removed: bs_cut_edges,
+        cost_to_add_edge: cost_to_add_edge,
+        total_cost: bs_min_cost,
+    });
+
+
+    info!("Checking for best possible parallel cut vs gemini...");
+    let result = best_parallel_cut_v2(&dfg, &all_activities);
+    info!("\n=== BEST PARALLEL CUT RESULTS ===");
+    info!("Minimum cost: {}", result.min_cost);
+    info!("Total Number of Edges to Add: {}", result.num_added_edges);
+    info!("Set1: {:?}", result.set1);
+    info!("Set2: {:?}", result.set2);
+    // Add parallel cut suggestion
+    cuts.push(CutSuggestion {
+        cut_type: "parallel".to_string(),
+        set1: result.set1,
+        set2: result.set2,
+        edges_to_be_added: result.added_edges,
+        edges_to_be_removed: Vec::new(), 
+        cost_to_add_edge: cost_to_add_edge,
+        total_cost: result.min_cost,
+    });
+
+     // Create the final result structure
+    let cut_suggestions_list: CutSuggestionsList = CutSuggestionsList {
+        all_activities: all_activities.clone(),
+        cuts,
+    };
+
+    cut_suggestions_list
     
-
-    
-
-
 }
 
 // Exclusive cut and helpers --------------
@@ -192,8 +401,14 @@ fn find_exclusive_choice_cut(
     let mut undirected_graph: HashMap<String, HashSet<String>> = HashMap::new();
 
     for ((from, to), _) in dfg {
-        undirected_graph.entry(from.clone()).or_default().insert(to.clone());
-        undirected_graph.entry(to.clone()).or_default().insert(from.clone());
+        undirected_graph
+            .entry(from.clone())
+            .or_default()
+            .insert(to.clone());
+        undirected_graph
+            .entry(to.clone())
+            .or_default()
+            .insert(from.clone());
     }
 
     for activity in all_activities {
@@ -267,8 +482,10 @@ fn exclusive_cut_condition_check(
 }
 
 // ------- Sequence cut and helpers ------------
-fn find_sequence_cut(dfg: &HashMap<(String, String), usize>, all_activities: &HashSet<String>)
--> (HashSet<String>, HashSet<String>) {
+fn find_sequence_cut(
+    dfg: &HashMap<(String, String), usize>,
+    all_activities: &HashSet<String>,
+) -> (HashSet<String>, HashSet<String>) {
     let sccs = strongly_connected_components(&dfg, &all_activities);
     // println!("SCCs:");
     // for (i, comp) in sccs.iter().enumerate() {
@@ -416,20 +633,20 @@ pub fn partition_scc_sets(
             set2.insert(*to);
         }
     }
-    
+
     // Find common activities and remove them from both sets
     let intersection: HashSet<_> = set1.intersection(&set2).cloned().collect();
     let mut common_activities = intersection.clone();
-    
+
     for i in &intersection {
         set1.remove(i);
         set2.remove(i);
     }
-    
+
     // For each common activity, decide whether to put it in set1 or set2
     for c in common_activities {
         let mut all_can_reach_and_c_cannot_reach_back = true;
-        
+
         // Check if every activity 't' in set1 can reach 'c', and 'c' cannot reach 't'
         for t in &set1 {
             if !is_reachable_in_dag(dag, *t, c) || is_reachable_in_dag(dag, c, *t) {
@@ -437,30 +654,30 @@ pub fn partition_scc_sets(
                 break;
             }
         }
-        
+
         if all_can_reach_and_c_cannot_reach_back {
             set2.insert(c);
         } else {
             set1.insert(c);
         }
     }
-    
+
     // Map SCCs to activity sets
     let mut act_set1 = HashSet::new();
     let mut act_set2 = HashSet::new();
-    
+
     for i in &set1 {
         for act in &sccs[*i] {
             act_set1.insert(act.clone());
         }
     }
-    
+
     for i in &set2 {
         for act in &sccs[*i] {
             act_set2.insert(act.clone());
         }
     }
-    
+
     (act_set1, act_set2)
 }
 
@@ -471,7 +688,7 @@ pub fn is_reachable_in_dag(
 ) -> bool {
     let mut visited = HashSet::new();
     let mut stack = vec![activity1];
-    
+
     while let Some(current) = stack.pop() {
         if current == activity2 {
             return true;
@@ -582,10 +799,10 @@ fn find_redo_cut(
         let is_s1_redo = is_reachable_before_end_activity(start_activities, x, end_activities, dfg);
         let is_s2_redo = is_reachable_before_end_activity(end_activities, x, start_activities, dfg);
 
-        if is_s1_redo && !is_s2_redo{
+        if is_s1_redo && !is_s2_redo {
             set1.insert(x.clone());
         } else if (!is_s1_redo && is_s2_redo) {
-            set2.insert(x.clone());            
+            set2.insert(x.clone());
         } else {
             return (false, set1, set2);
         }
@@ -678,9 +895,7 @@ fn filter_keep_dfg(
     keep_list: &HashSet<String>,
 ) -> HashMap<(String, String), usize> {
     dfg.iter()
-        .filter(|((from, to), _)| {
-            keep_list.contains(from) && keep_list.contains(to)
-        })
+        .filter(|((from, to), _)| keep_list.contains(from) && keep_list.contains(to))
         .map(|(k, v)| (k.clone(), *v))
         .collect()
 }
@@ -692,7 +907,9 @@ fn check_bi_direction_sets(
 ) -> bool {
     for m in set1 {
         for n in set2 {
-            if !dfg.contains_key(&(m.clone(), n.clone())) || !dfg.contains_key(&(n.clone(), m.clone())) {
+            if !dfg.contains_key(&(m.clone(), n.clone()))
+                || !dfg.contains_key(&(n.clone(), m.clone()))
+            {
                 return false;
             }
         }
