@@ -2,9 +2,11 @@ use crate::best_exclusive_cut::best_exclusive_cut;
 use crate::best_parallel_cut::best_parallel_cut;
 use crate::best_parallel_cut_exhaustive::best_parallel_cut_exhaustive;
 use crate::best_parallel_cut_v2::best_parallel_cut_v2;
+use crate::best_parallel_cut_v3::best_parallel_cut_v3;
 use crate::best_redo_cuts::best_redo_cut;
 use crate::best_sequence_cut::best_sequence_cut;
 use crate::best_sequence_cut_v2;
+use crate::cost_to_add::cost_of_adding_edge;
 use crate::cost_to_cut::is_reachable;
 use crate::cost_to_cut::to_be_non_reachable;
 use crate::good_cuts::best_possible_sequence_cut;
@@ -165,14 +167,23 @@ pub fn find_cuts_start(
         all_activities
     );
 
-    // If no valid cuts are found, return disjoint trees
+    // If no valid cuts are found, create a flower node with disjoint activities as children
+    let mut flower_node = TreeNode {
+        label: "flower".to_string(),
+        children: Vec::new(),
+    };
+
+    // Add all activities as children of the flower node
     for activity in activities {
-        let node = TreeNode {
+        let child_node = TreeNode {
             label: activity,
             children: Vec::new(),
         };
-        forest.push(node);
+        flower_node.children.push(child_node);
     }
+
+    // Add the flower node to the forest
+    forest.push(flower_node);
 
     return forest;
 
@@ -315,7 +326,34 @@ pub fn find_best_possible_cuts(
 
     let mut cuts: Vec<CutSuggestion> = Vec::new();
 
-    let mut cost_to_add_edge: usize = 1;
+    let mut cost_to_add_edge: usize = cost_of_adding_edge(&filtered_dfg);
+
+    info!("Checking for best possible exclusive cut...");
+    let (be_min_cost, be_cut_edges, be_set1, be_set2, be_new_dfg) = best_exclusive_cut(&dfg, &all_activities);
+    info!("\n=== BEST EXCLUSIVE CUT RESULTS ===");
+    info!("Minimum Cost: {}", be_min_cost);
+    info!("Cut Edges: {:?}", be_cut_edges);
+    info!("Set 1: {:?}", be_set1);
+    info!("Set 2: {:?}", be_set2);
+    let (is_exclusive, be_failures) = exclusive_cut_condition_check(&be_new_dfg, &be_set1, &be_set2);
+    if(!is_exclusive) {
+        // I dont think this is possible, but just in case
+        // because, for 'a' in set1, and 'b' in set2, we would definitely have a forced sequence cut
+        info!("Exclusive cut condition failed for sets: {:?} and {:?}", be_set1, be_set2);
+        for (a, b, r1, r2) in be_failures {
+            info!("Condition failure: {} -> {} (reachable: {}, {})", a, b, r1, r2);
+        }
+    }
+    cuts.push(CutSuggestion {
+        cut_type: "exclusive".to_string(),
+        set1: be_set1,
+        set2: be_set2,
+        edges_to_be_added: Vec::new(),
+        edges_to_be_removed: be_cut_edges,
+        cost_to_add_edge: cost_to_add_edge,
+        total_cost: be_min_cost,
+    });
+
 
     info!("Checking for best possible sequence cut...");
     let (
@@ -327,7 +365,7 @@ pub fn find_best_possible_cuts(
         bs_set1,
         bs_set2,
         bs_new_dfg,
-    ) = best_sequence_cut(&filtered_dfg, &all_activities);
+    ) = best_sequence_cut(&filtered_dfg, &all_activities, &cost_to_add_edge);
     info!("\n=== BEST SEQUENCE CUT RESULTS ===");
     info!("Minimum Cost: {}", bs_min_cost);
     info!("Number of cut edges: {}", bs_no_of_cuts);
@@ -364,23 +402,34 @@ pub fn find_best_possible_cuts(
     });
 
 
-    info!("Checking for best possible parallel cut vs gemini...");
-    let result = best_parallel_cut_v2(&dfg, &all_activities);
-    info!("\n=== BEST PARALLEL CUT RESULTS ===");
-    info!("Minimum cost: {}", result.min_cost);
-    info!("Total Number of Edges to Add: {}", result.num_added_edges);
-    info!("Set1: {:?}", result.set1);
-    info!("Set2: {:?}", result.set2);
+    info!("Checking for best possible parallel cut mine cla...");
+    let (
+        bp_min_cost,
+        bp_no_of_added_edges,
+        bp_added_edges,
+        bp_set1,
+        bp_set2,
+        bp_new_dfg,
+    ) = best_parallel_cut_v3(&dfg, &all_activities, &cost_to_add_edge);
+    println!("\n=== BEST PARALLEL CUT RESULTS mine cl ===");
+    println!("Minimum cost: {}", bp_min_cost);
+    println!("Total Number of Edges to Add: {:?}", bp_no_of_added_edges);
+    println!("Set1: {:?}", bp_set1);
+    println!("Set2: {:?}", bp_set2);
     // Add parallel cut suggestion
     cuts.push(CutSuggestion {
         cut_type: "parallel".to_string(),
-        set1: result.set1,
-        set2: result.set2,
-        edges_to_be_added: result.added_edges,
-        edges_to_be_removed: Vec::new(), 
+        set1: bp_set1,
+        set2: bp_set2,
+        edges_to_be_added: bp_added_edges,
+        edges_to_be_removed: Vec::new(),
         cost_to_add_edge: cost_to_add_edge,
-        total_cost: result.min_cost,
+        total_cost: bp_min_cost,
     });
+
+    
+
+    
 
      // Create the final result structure
     let cut_suggestions_list: CutSuggestionsList = CutSuggestionsList {

@@ -176,7 +176,6 @@ pub fn best_exclusive_cut(
             graph.add_edge(source.clone(), activity_s.clone(), inf_capacity);
             graph.add_edge(activity_t.clone(), sink.clone(), inf_capacity);
 
-            print_graph(&graph);
             
             // Add all DFG edges as undirected edges in the graph
             for ((from, to), weight) in dfg {
@@ -250,56 +249,4 @@ pub fn best_exclusive_cut(
     //info!("Set1: {:?}, Set2: {:?}", best_set1, best_set2);
     
     (min_cost, best_cut_edges, best_set1, best_set2, new_dfg)
-}
-
-// Test function to verify the algorithm
-pub fn test_example() {
-    let mut dfg: HashMap<(String, String), usize> = HashMap::new();
-    dfg.insert(("A".to_string(), "B".to_string()), 10);
-    dfg.insert(("A".to_string(), "C".to_string()), 1);
-    dfg.insert(("B".to_string(), "D".to_string()), 1);
-    dfg.insert(("B".to_string(), "C".to_string()), 2);
-    dfg.insert(("D".to_string(), "C".to_string()), 12);
-
-    let all_activities: HashSet<String> = ["A", "B", "C", "D"]
-        .iter()
-        .map(|s| s.to_string())
-        .collect();
-
-    println!("Input DFG:");
-    for ((from, to), weight) in &dfg {
-        println!("  {} -> {} : {}", from, to, weight);
-    }
-
-    let (min_cost, cut_edges, set1, set2, _new_dfg) = best_exclusive_cut(&dfg, &all_activities);
-    
-    println!("\nResult:");
-    println!("Min cost: {}", min_cost);
-    println!("Cut edges: {:?}", cut_edges);
-    println!("Set 1: {:?}", set1);
-    println!("Set 2: {:?}", set2);
-    
-    // Verify the cut cost manually
-    let mut manual_cost = 0;
-    for (from, to) in &cut_edges {
-        if let Some(cost) = dfg.get(&(from.clone(), to.clone())) {
-            manual_cost += cost;
-            println!("Cut edge {} -> {} with cost {}", from, to, cost);
-        }
-    }
-    println!("Manual verification of cut cost: {}", manual_cost);
-}
-
-fn print_graph(
-    graph: &Graph
-) {
-    //info!("--- Graph Capacities ---");
-    for ((from, to), cap) in &graph.capacity {
-        //info!("Edge: {} -> {} | Capacity: {}", from, to, cap);
-    }
-    //info!("--- Graph Flows ---");
-    for ((from, to), flow) in &graph.flow {
-        //info!("Edge: {} -> {} | Flow: {}", from, to, flow);
-    }
-    //info!("------------------------");
 }

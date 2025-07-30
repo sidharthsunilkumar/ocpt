@@ -21,6 +21,7 @@ mod best_exclusive_cut;
 mod best_parallel_cut;
 mod best_parallel_cut_exhaustive;
 mod best_parallel_cut_v2;
+mod best_parallel_cut_v3;
 mod best_redo_cuts;
 mod best_sequence_cut;
 mod best_sequence_cut_v2;
@@ -46,7 +47,7 @@ use serde_json::Value;
 
 // GET / — serves the content of dfg.json as JSON
 async fn hello() -> Json<Value> {
-    let file_content = tokiofs::read_to_string("data/order_management_tree.json")
+    let file_content = tokiofs::read_to_string("dfs-diagrams/dfg_github_pm4py.json")
         .await
         .expect("Failed to read dfg.json");
     let json: Value =
@@ -77,8 +78,14 @@ async fn getInitialResponse() -> Json<Value> {
 
     println!("Starting...");
 
-    let file_path = "data/github_pm4py.jsonocel";
+    let file_name="p2p";
+    // let file_name ="github_pm4py";
+    let file_path = format!("data/{}.jsonocel", file_name);
+
+    // let file_path = "data/github_pm4py.jsonocel";
     // let file_path = "data/o2c.jsonocel";
+    // let file_path = "data/p2p.jsonocel";
+    // let file_path = "data/recruiting.jsonocel";
 
     let file_content = stdfs::read_to_string(&file_path).unwrap();
     let ocel: OcelJson = serde_json::from_str(&file_content).unwrap();
@@ -113,6 +120,12 @@ async fn getInitialResponse() -> Json<Value> {
 
 
     let json_dfg: Value = format_conversion::dfg_to_json(&dfg);
+
+    // Save to file
+    let dfs_path = format!("dfs-diagrams/dfg_{}.json", file_name);
+    let mut file = File::create(&dfs_path).expect("Failed to create file");
+    let json_string = serde_json::to_string(&json_dfg).expect("Failed to serialize DFG to JSON");
+    file.write_all(json_string.as_bytes()).expect("Failed to write to file");
 
     let start_time = std::time::Instant::now();
 
@@ -173,7 +186,7 @@ async fn getInitialResponse() -> Json<Value> {
 // Handler for POST /cut-selected
 async fn cut_selected_handler(
     AxumJson(payload): AxumJson<CutSelectedAPIRequest>,
-) -> (StatusCode, AxumJson<serde_json::Value>) {
+) -> (Json<Value>) {
     println!("Received cut-selected request: {:?}", payload.cut_selected);
 
     let mut ocpt: ProcessForest = from_json_value(&payload.ocpt);
@@ -201,33 +214,12 @@ async fn cut_selected_handler(
     println!("new dfg:\n ");
     print_dfg(&dfg);
 
-    let process_forest_set1 = start_cuts_opti_v2::find_cuts_start(
+    let new_tree_node = create_new_tree_node_by_cut_selection(
         &dfg,
-        &cut_selected.set1,
+        &cut_selected,
         &global_start_activities,
         &global_end_activities,
     );
-
-    let process_forest_set2 = start_cuts_opti_v2::find_cuts_start(
-        &dfg,
-        &cut_selected.set2,
-        &global_start_activities,
-        &global_end_activities,
-    );
-
-    println!("Process Forest Set 1:\n ");
-    print_process_forest(&process_forest_set1);
-
-    println!("Process Forest Set 2:\n ");
-    print_process_forest(&process_forest_set2);
-
-    let mut children = Vec::new();
-    children.extend(process_forest_set1);
-    children.extend(process_forest_set2);
-    let new_tree_node: TreeNode = TreeNode {
-        label: cut_selected.cut_type.clone(),
-        children,
-    };
             
     
 
@@ -240,16 +232,50 @@ async fn cut_selected_handler(
     println!("new ocpt:\n ");
     print_process_forest(&ocpt);
 
-    // 3. Create the response with the updated DFG and OCPT
-    let response = serde_json::json!({
-        "status": "success",
-        "message": "Cut operation performed",
-        "OCPT": process_forest_to_json(&ocpt),
-        "dfg": format_conversion::dfg_to_json(&dfg),
-        "is_perfectly_cut": true
-    });
 
-    (StatusCode::OK, AxumJson(response))
+
+    let json_dfg: Value = format_conversion::dfg_to_json(&dfg);
+
+
+    let mut response:APIResponse = APIResponse {
+        OCPT: serde_json::Value::String(String::new()),
+        dfg: json_dfg,
+        start_activities: global_start_activities.clone(),
+        end_activities: global_end_activities.clone(),
+        is_perfectly_cut: true,
+        cut_suggestions_list: CutSuggestionsList {
+            all_activities: HashSet::new(),
+            cuts: Vec::new(),
+        },
+    };
+
+    // // Convert to JSON string
+    let ocpt_json_string = process_forest_to_json(&ocpt);
+    println!("OCPT JSON string:\n{}", ocpt_json_string);
+    response.OCPT = ocpt_json_string;
+
+    let (found_disjoint, disjoint_activities) = collect_disjoint_activities(&ocpt);
+
+    // Print disjoint activities
+    if found_disjoint {
+        println!(
+            "Disjoint activities found in OCPT: {:?}",
+            disjoint_activities
+        );
+        response.is_perfectly_cut = false;
+        let cut_suggestions_list = start_cuts_opti_v2::find_best_possible_cuts(
+            &dfg,
+            &disjoint_activities,
+            &global_start_activities,
+            &global_end_activities,
+        );
+        response.cut_suggestions_list = cut_suggestions_list;
+    } else {
+        println!("No disjoint activities found in the OCPT");
+    }
+
+
+    Json(serde_json::to_value(response).unwrap())
 }
 
 fn modify_process_forest(
@@ -263,77 +289,72 @@ fn modify_process_forest(
         return ocpt;
     }
 
-    // First pass: process children of objects with special labels
+    // Process each node in the forest
     for node in ocpt.iter_mut() {
-        if matches!(node.label.as_str(), "sequence" | "parallel" | "exclusive" | "redo") {
-            if !node.children.is_empty() {
-                node.children = modify_process_forest(node.children.clone(), disjoint_activities, cut_selected, new_tree_node);
-            }
-        }
-    }
+        match node.label.as_str() {
+            // For sequence, parallel, exclusive, redo nodes
+            label @ ("sequence" | "parallel" | "exclusive" | "redo") => {
+                if !node.children.is_empty() {
+                    node.children = modify_process_forest(
+                        node.children.clone(), 
+                        disjoint_activities, 
+                        cut_selected,
+                        new_tree_node
+                    );
+                }
+            },
+            // For flower nodes
+            "flower" => {
+                // Collect labels of all children
+                let list_d: HashSet<String> = node.children.iter()
+                    .map(|child| child.label.clone())
+                    .collect();
 
-   
-
-    // Collect labels of objects that don't have special labels
-    let list_d: HashSet<String> = ocpt.iter()
-        .filter(|node| !matches!(node.label.as_str(), "sequence" | "parallel" | "exclusive" | "redo"))
-        .map(|node| node.label.clone())
-        .collect();
-
-    // println!("list_d: {:?}", list_d);
-
-    // Return original if no match or empty list_d
-    if list_d.is_empty() || list_d != *disjoint_activities {
-        return ocpt;
-    }
-
-    // if list_d == *disjoint_activities {
-    //     // If the disjoint activities match, we can proceed with the cut
-    //     println!("Disjoint activities match: {:?}", list_d);
-    // } 
-
-    
-
-    // Find cut object and its placement
-    let mut cut_object = None;
-    let mut cut_object_placement = None;
-
-    // Check first and last positions for cut object
-    if ocpt.first().map_or(false, |node| {
-        matches!(node.label.as_str(), "sequence" | "parallel" | "exclusive" | "redo")
-    }) {
-        cut_object = Some(ocpt.remove(0));
-        cut_object_placement = Some("beginning");
-    } else if ocpt.last().map_or(false, |node| {
-        matches!(node.label.as_str(), "sequence" | "parallel" | "exclusive" | "redo")
-    }) {
-        let idx = ocpt.len() - 1;
-        cut_object = Some(ocpt.remove(idx));
-        cut_object_placement = Some("last");
-    }
-
-    
-
-
-
-    // Create new OCPT based on cut_object placement
-    let mut new_ocpt = Vec::new();
-    
-    match (cut_object, cut_object_placement) {
-        (Some(obj), Some("beginning")) => {
-            new_ocpt.push(obj);
-            new_ocpt.push(new_tree_node.clone());
-        }
-        (Some(obj), Some("last")) => {
-            new_ocpt.push(new_tree_node.clone());
-            new_ocpt.push(obj);
-        }
-        (_, _) => {
-            new_ocpt.push(new_tree_node.clone());
+                // If children match disjoint activities or list is empty, replace with new tree node
+                if list_d.is_empty() || list_d == *disjoint_activities {
+                    *node = new_tree_node.clone();
+                }
+            },
+            _ => {} // Skip other nodes
         }
     }
     
-    new_ocpt
+    ocpt
+}
+
+fn create_new_tree_node_by_cut_selection(
+    dfg: &HashMap<(String, String), usize>,
+    cut_selected: &CutSuggestion,
+    global_start_activities: &HashSet<String>,
+    global_end_activities: &HashSet<String>
+) -> TreeNode {
+    let process_forest_set1 = start_cuts_opti_v2::find_cuts_start(
+        dfg,
+        &cut_selected.set1,
+        global_start_activities,
+        global_end_activities,
+    );
+
+    let process_forest_set2 = start_cuts_opti_v2::find_cuts_start(
+        dfg,
+        &cut_selected.set2,
+        global_start_activities,
+        global_end_activities,
+    );
+
+    println!("Process Forest Set 1:\n ");
+    print_process_forest(&process_forest_set1);
+
+    println!("Process Forest Set 2:\n ");
+    print_process_forest(&process_forest_set2);
+
+    let mut children = Vec::new();
+    children.extend(process_forest_set1);
+    children.extend(process_forest_set2);
+    TreeNode {
+        label: cut_selected.cut_type.clone(),
+        children,
+    }
 }
 
 #[tokio::main]
@@ -346,6 +367,7 @@ async fn main() {
 
     let app = Router::new()
         .route("/", get(getInitialResponse))
+        .route("/dfg", get(hello))
         .route("/cut-selected", axum::routing::post(cut_selected_handler))
         .layer(cors);
     
@@ -575,35 +597,32 @@ fn get_start_and_end_activities_from_dfg(
     (start_activities, end_activities)
 }
 
-// Function to collect disjoint activities
+// Function to collect disjoint activities from flower node
 fn collect_disjoint_activities(forest: &ProcessForest) -> (bool, HashSet<String>) {
     let mut disjoint_activities: HashSet<String> = HashSet::new();
 
-    fn find_first_disjoint(nodes: &[TreeNode], disjoint_set: &mut HashSet<String>) -> bool {
+    fn find_flower_node(nodes: &[TreeNode], disjoint_set: &mut HashSet<String>) -> bool {
         for node in nodes {
-            // Check if this node has more than 2 children (indicating disjoint activities)
-            if node.children.len() > 2 {
+            // Check if this is a flower node
+            if node.label == "flower" {
                 // Add all child activity names to the disjoint set
                 for child in &node.children {
-                    // Only add leaf nodes (activities without children)
-                    if child.children.is_empty() {
-                        disjoint_set.insert(child.label.clone());
-                    }
+                    disjoint_set.insert(child.label.clone());
                 }
-                return true; // Found first disjoint set, return immediately
+                return true; // Found flower node, return immediately
             }
 
             // Recursively check children
             if !node.children.is_empty() {
-                if find_first_disjoint(&node.children, disjoint_set) {
+                if find_flower_node(&node.children, disjoint_set) {
                     return true; // Found in children, propagate up
                 }
             }
         }
-        false // No disjoint set found
+        false // No flower node found
     }
 
-    let found = find_first_disjoint(forest, &mut disjoint_activities);
+    let found = find_flower_node(forest, &mut disjoint_activities);
     (found, disjoint_activities)
 }
 

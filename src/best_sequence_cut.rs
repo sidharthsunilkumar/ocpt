@@ -1,12 +1,12 @@
 use std::collections::{HashMap, HashSet};
-use crate::cost_to_add::add_edge_to_dfg;
 use crate::cost_to_cut::is_reachable;
 use crate::cost_to_cut::to_be_non_reachable;
 use log::info;
 
 pub fn best_sequence_cut(
     dfg: &HashMap<(String, String), usize>, 
-    all_activities: &HashSet<String>
+    all_activities: &HashSet<String>,
+    cost_to_add_edge: &usize
 ) -> (usize, usize, Vec<(String, String)>, usize, Vec<(String, String)>, HashSet<String>, HashSet<String>, HashMap<(String, String), usize>) {
     let mut min_cost = usize::MAX;
     let mut best_no_of_cut_edges = 0;
@@ -81,9 +81,9 @@ pub fn best_sequence_cut(
                     for s2 in &set2 {
                         if !is_reachable(&new_dfg, s1, s2) {
                             // Add edge and update cost
-                            let (updated_dfg, add_cost) = add_edge_to_dfg(&new_dfg, s1, s2);
-                            new_dfg = updated_dfg;
-                            total_cost += add_cost;
+                            let edge = (s1.clone(), s2.clone());
+                            new_dfg.insert(edge, cost_to_add_edge.clone());
+                            total_cost += cost_to_add_edge;
                             added_edges.push((s1.clone(), s2.clone()));
                             no_of_added_edges += 1;
                         }
