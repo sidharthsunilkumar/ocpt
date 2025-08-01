@@ -427,9 +427,29 @@ pub fn find_best_possible_cuts(
         total_cost: bp_min_cost,
     });
 
-    
+    info!("Checking for best redo cut...");
+    let (br_is_redo, br_min_cost, br_edges_removed, br_edges_added, br_cost_of_added_edges, br_cost_of_removed_edges, br_set1, br_set2, br_new_dfg) =
+        best_redo_cut(&filtered_dfg, &all_activities, &start_activities, &end_activities, &cost_to_add_edge);
 
-    
+    info!("\n=== BEST REDO CUT RESULTS ===");
+    info!("Is Redo Cut Possible: {}", br_is_redo);
+    info!("Minimum Cost: {}", br_min_cost);
+    info!("Edges Removed: {:?}", br_edges_removed);
+    info!("Edges Added: {:?}", br_edges_added);
+    info!("Cost of Added Edges: {}", br_cost_of_added_edges);
+    info!("Cost of Removed Edges: {}", br_cost_of_removed_edges);
+    info!("Set 1: {:?}", br_set1);
+    info!("Set 2: {:?}", br_set2);
+    // info!("new dfg: {:?}", br_new_dfg);
+    cuts.push(CutSuggestion {
+        cut_type: "redo".to_string(),
+        set1: br_set1,
+        set2: br_set2,
+        edges_to_be_added: br_edges_added,
+        edges_to_be_removed: br_edges_removed,
+        cost_to_add_edge: cost_to_add_edge,
+        total_cost: br_min_cost,
+    });
 
      // Create the final result structure
     let cut_suggestions_list: CutSuggestionsList = CutSuggestionsList {
