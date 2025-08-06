@@ -5,8 +5,8 @@ use log::info;
 // Returns:
 // 0: bool - whether the redo cut was successful
 // 1: usize - total cost (cost of edges added + cost of edges removed)
-// 2: Vec<(String, String)> - list of edges that were removed
-// 3: Vec<(String, String)> - list of edges that were added
+// 2: Vec<(String, String, usize)> - list of edges that were removed with their costs
+// 3: Vec<(String, String, usize)> - list of edges that were added with their costs
 // 4: usize - cost of edges added
 // 5: usize - cost of edges removed
 // 6: HashSet<String> - set1 (first partition)
@@ -18,7 +18,7 @@ pub fn best_redo_cut(
     start_activities: &HashSet<String>,
     end_activities: &HashSet<String>,
     cost_to_add_edge: &usize
-) -> (bool, usize, Vec<(String, String)>, Vec<(String, String)>, usize, usize, HashSet<String>, HashSet<String>, HashMap<(String, String), usize>) {
+) -> (bool, usize, Vec<(String, String, usize)>, Vec<(String, String, usize)>, usize, usize, HashSet<String>, HashSet<String>, HashMap<(String, String), usize>) {
 
     let mut set1: HashSet<String> = HashSet::new();
     let mut set2: HashSet<String> = HashSet::new();
@@ -26,8 +26,8 @@ pub fn best_redo_cut(
     let mut total_cost = 0usize;
     let mut cost_of_edges_added = 0usize;
     let mut cost_of_edges_removed = 0usize;
-    let mut edges_removed: Vec<(String, String)> = Vec::new();
-    let mut edges_added: Vec<(String, String)> = Vec::new();
+    let mut edges_removed: Vec<(String, String, usize)> = Vec::new();
+    let mut edges_added: Vec<(String, String, usize)> = Vec::new();
 
     // Step 1: Create start_to_end_activity_pairs
     let mut start_to_end_activity_pairs: Vec<(String, String)> = Vec::new();
@@ -198,10 +198,10 @@ fn remove_edges_for_redo(
     dfg: &HashMap<(String, String), usize>,
     set1: &HashSet<String>,
     set2: &HashSet<String>
-) -> (HashMap<(String, String), usize>, usize, Vec<(String, String)>) {
+) -> (HashMap<(String, String), usize>, usize, Vec<(String, String, usize)>) {
     let mut new_dfg = dfg.clone();
     let mut total_cost = 0usize;
-    let mut edges_to_remove: Vec<(String, String)> = Vec::new();
+    let mut edges_to_remove: Vec<(String, String, usize)> = Vec::new();
     
     for (edge, cost) in dfg.iter() {
         let a = &edge.0;
@@ -216,14 +216,14 @@ fn remove_edges_for_redo(
         
         // Remove edge if both nodes are not start/end activities AND they're from different sets
         if a_not_start_end && b_not_start_end && different_sets {
-            edges_to_remove.push(edge.clone());
+            edges_to_remove.push((edge.0.clone(), edge.1.clone(), *cost));
             total_cost += cost;
         }
     }
     
     // Remove the collected edges
-    for edge in &edges_to_remove {
-        new_dfg.remove(edge);
+    for (from, to, _cost) in &edges_to_remove {
+        new_dfg.remove(&(from.clone(), to.clone()));
     }
     
     (new_dfg, total_cost, edges_to_remove)
@@ -290,9 +290,9 @@ fn add_edges_for_redo(
     end_activities: &HashSet<String>,
     activity_x: &String,
     cost_to_add_edge: &usize
-) -> (HashMap<(String, String), usize>, Vec<(String, String)>, usize) {
+) -> (HashMap<(String, String), usize>, Vec<(String, String, usize)>, usize) {
     let mut new_dfg = dfg.clone();
-    let mut edges_added: Vec<(String, String)> = Vec::new();
+    let mut edges_added: Vec<(String, String, usize)> = Vec::new();
     let mut total_cost = 0usize;
     
     // Find all pairs (c,d) that should have edges added
@@ -322,7 +322,7 @@ fn add_edges_for_redo(
                     
                     if should_add && !edge_exists {
                         new_dfg.insert((c.clone(), d.clone()), *cost_to_add_edge);
-                        edges_added.push((c.clone(), d.clone()));
+                        edges_added.push((c.clone(), d.clone(), *cost_to_add_edge));
                         total_cost += cost_to_add_edge;
                     }
                 }
@@ -342,7 +342,7 @@ fn try_case_add_to_set1_new(
     set1: &HashSet<String>,
     set2: &HashSet<String>,
     cost_to_add_edge: &usize
-) -> (usize, HashMap<(String, String), usize>, Vec<(String, String)>, Vec<(String, String)>) {
+) -> (usize, HashMap<(String, String), usize>, Vec<(String, String, usize)>, Vec<(String, String, usize)>) {
     let mut test_set1 = set1.clone();
     test_set1.insert(x.clone());
     
@@ -364,7 +364,7 @@ fn try_case_add_to_set2_new(
     set1: &HashSet<String>,
     set2: &HashSet<String>,
     cost_to_add_edge: &usize
-) -> (usize, HashMap<(String, String), usize>, Vec<(String, String)>, Vec<(String, String)>) {
+) -> (usize, HashMap<(String, String), usize>, Vec<(String, String, usize)>, Vec<(String, String, usize)>) {
     let mut test_set2 = set2.clone();
     test_set2.insert(x.clone());
     

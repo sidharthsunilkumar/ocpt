@@ -47,7 +47,7 @@ use serde_json::Value;
 
 // GET / — serves the content of dfg.json as JSON
 async fn hello() -> Json<Value> {
-    let file_content = tokiofs::read_to_string("dfs-diagrams/dfg_github_pm4py.json")
+    let file_content = tokiofs::read_to_string("ddfg-diagrams/ddfg_order-management.json")
         .await
         .expect("Failed to read dfg.json");
     let json: Value =
@@ -56,36 +56,16 @@ async fn hello() -> Json<Value> {
     Json(json)
 }
 
-#[tokio::main]
-async fn main23() {
-    // Configure CORS
-    let cors = CorsLayer::new()
-        .allow_methods(Any)
-        .allow_origin(Any)
-        .allow_headers(Any);
-
-    let app = Router::new().route("/", get(hello)).layer(cors);
-
-    println!("Server running on http://localhost:1080");
-    println!("GET  / - Hello World");
-    println!("POST /print - Prints body to console");
-
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:1080").await.unwrap();
-    axum::serve(listener, app).await.unwrap();
-}
 
 async fn getInitialResponse() -> Json<Value> {
 
     println!("Starting...");
 
-    let file_name="p2p";
-    // let file_name ="github_pm4py";
-    let file_path = format!("data/{}.jsonocel", file_name);
-
-    // let file_path = "data/github_pm4py.jsonocel";
-    // let file_path = "data/o2c.jsonocel";
-    // let file_path = "data/p2p.jsonocel";
-    // let file_path = "data/recruiting.jsonocel";
+    // Changed to use OCEL 2.0 format
+    let file_name ="order-management";
+    let file_path = "data/order-management.json";
+    // let file_name ="ContainerLogistics";
+    // let file_path = "data/ContainerLogistics.json";
 
     let file_content = stdfs::read_to_string(&file_path).unwrap();
     let ocel: OcelJson = serde_json::from_str(&file_content).unwrap();
@@ -122,7 +102,7 @@ async fn getInitialResponse() -> Json<Value> {
     let json_dfg: Value = format_conversion::dfg_to_json(&dfg);
 
     // Save to file
-    let dfs_path = format!("dfs-diagrams/dfg_{}.json", file_name);
+    let dfs_path = format!("ddfg-diagrams/ddfg_{}.json", file_name);
     let mut file = File::create(&dfs_path).expect("Failed to create file");
     let json_string = serde_json::to_string(&json_dfg).expect("Failed to serialize DFG to JSON");
     file.write_all(json_string.as_bytes()).expect("Failed to write to file");
@@ -148,6 +128,8 @@ async fn getInitialResponse() -> Json<Value> {
             all_activities: HashSet::new(),
             cuts: Vec::new(),
         },
+        total_edges_added: Vec::new(),
+        total_edges_removed: Vec::new(),
     };
 
     // // Convert to JSON string
@@ -195,6 +177,8 @@ async fn cut_selected_handler(
     let global_end_activities: HashSet<String> = payload.end_activities;
     let cut_suggestions_list: CutSuggestionsList = payload.cut_suggestions_list;
     let cut_selected: CutSuggestion = payload.cut_selected;
+    let mut total_edges_removed: Vec<(String, String, usize)> = payload.total_edges_removed;
+    let mut total_edges_added: Vec<(String, String, usize)> = payload.total_edges_added;
 
     println!("old dfg:\n ");
     print_dfg(&dfg);
@@ -202,12 +186,12 @@ async fn cut_selected_handler(
 
     // 1. Modify the DFG according to the selected cut
     // Remove edges that need to be cut
-    for (from, to) in &cut_selected.edges_to_be_removed {
+    for (from, to, _) in &cut_selected.edges_to_be_removed {
         dfg.remove(&(from.clone(), to.clone()));
     }
     
     // Add new edges with default weight of 1
-    for (from, to) in &cut_selected.edges_to_be_added {
+    for (from, to, _) in &cut_selected.edges_to_be_added {
         dfg.insert((from.clone(), to.clone()), (cut_selected.cost_to_add_edge).clone());
     }
 
@@ -236,6 +220,9 @@ async fn cut_selected_handler(
 
     let json_dfg: Value = format_conversion::dfg_to_json(&dfg);
 
+    // 3. Add to total edges removed and added from cut selected
+    total_edges_removed.extend(cut_selected.edges_to_be_removed.clone());
+    total_edges_added.extend(cut_selected.edges_to_be_added.clone());
 
     let mut response:APIResponse = APIResponse {
         OCPT: serde_json::Value::String(String::new()),
@@ -247,6 +234,8 @@ async fn cut_selected_handler(
             all_activities: HashSet::new(),
             cuts: Vec::new(),
         },
+        total_edges_added: total_edges_added.clone(),
+        total_edges_removed: total_edges_removed.clone(),
     };
 
     // // Convert to JSON string
@@ -375,145 +364,6 @@ async fn main() {
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:1080").await.unwrap();
     axum::serve(listener, app).await.unwrap();
-}
-
-fn mainlk() {
-    println!("Starting...");
-
-    CombinedLogger::init(vec![
-        TermLogger::new(
-            LevelFilter::Info,
-            Config::default(),
-            TerminalMode::Mixed,
-            ColorChoice::Auto,
-        ),
-        WriteLogger::new(
-            LevelFilter::Info,
-            Config::default(),
-            File::create("process.log").unwrap(),
-        ),
-    ])
-    .unwrap();
-
-    // let file_path = "data/small-example-v4.jsonocel";
-    // let file_path = "data/running-example.jsonocel";
-    let file_path = "data/github_pm4py.jsonocel";
-    // let file_path = "data/o2c.jsonocel";
-
-    let file_content = stdfs::read_to_string(&file_path).unwrap();
-    let ocel: OcelJson = serde_json::from_str(&file_content).unwrap();
-
-    let relations = build_relations_fns::build_relations(&ocel.events, &ocel.objects);
-    // info!("size of relations: {}", relations.len());
-
-    let (div, con, rel, defi, all_activities, all_object_types) =
-        interaction_patterns::get_interaction_patterns(&relations, &ocel);
-
-    // info!("Divergent: {:?}",div);
-    // info!("Convergent: {:?}",con);
-    // info!("Relational: {:?}",rel);
-    // info!("Deficiency {:?}",defi);
-    // log_sorted_map("Divergent", &div);
-    // log_sorted_map("Convergent", &con);
-    // log_sorted_map("Relational", &rel);
-    // log_sorted_map("Deficiency", &defi);
-
-    let (dfg, start_acts, end_acts) =
-        divergence_free_dfg::get_divergence_free_graph_v2(&relations, &div);
-
-    println!("created DFG!");
-
-    print_dfg(&dfg);
-
-    // let remove_list = vec![];
-    // let remove_list = vec!["failed delivery".to_string(),"payment reminder".to_string()];
-    let remove_list = vec!["reopened".to_string()];
-    let filtered_dfg = filter_dfg(&dfg, &remove_list);
-    let filtered_activities = filter_activities(&all_activities, &remove_list);
-
-    // let temp = cost_to_add::all_possible_edges_to_add_to_dfg(&filtered_dfg, &filtered_activities);
-    // for (edge, cost) in &temp {
-    //     info!("Edge: {:?} with cost: {}", edge, cost);
-    // }
-
-    let json_dfg = format_conversion::dfg_to_json(&dfg);
-    // // Save to file
-    // let mut file = File::create("dfs-diagrams/dfg_o2c.json").expect("Failed to create file");
-    // file.write_all(json_string.as_bytes()).expect("Failed to write to file");
-
-    let start_time = std::time::Instant::now();
-
-    // let process_forest = start_cuts_gem::find_cuts(&dfg, &dfg, all_activities, &start_acts, &end_acts);
-    // In case of filtering activities in the begining
-    // let process_forest = start_cuts::find_cuts(&filtered_dfg, &filtered_dfg, filtered_activities, &start_acts, &end_acts);
-    let process_forest = start_cuts_opti_v2::find_cuts_start(
-        &filtered_dfg,
-        &filtered_activities,
-        &start_acts,
-        &end_acts,
-    );
-
-    let mut response:APIResponse = APIResponse {
-        OCPT: serde_json::Value::String(String::new()),
-        dfg: json_dfg,
-        start_activities: start_acts.clone(),
-        end_activities: end_acts.clone(),
-        is_perfectly_cut: true,
-        cut_suggestions_list: CutSuggestionsList {
-            all_activities: HashSet::new(),
-            cuts: Vec::new(),
-        },
-    };
-
-    // // Convert to JSON string
-    let ocpt_json_string = process_forest_to_json(&process_forest);
-    info!("OCPT JSON string:\n{}", ocpt_json_string);
-    response.OCPT = ocpt_json_string;
-
-    // // Convert back to ProcessForest
-    // let parsed_forest = json_to_process_forest(&json_string);
-    // info!("\nParsed ProcessForest:");
-    // print_process_forest(&parsed_forest);
-
-    let (found_disjoint, disjoint_activities) = collect_disjoint_activities(&process_forest);
-
-
-    // Print disjoint activities
-    if found_disjoint {
-        info!(
-            "Disjoint activities found in OCPT: {:?}",
-            disjoint_activities
-        );
-        response.is_perfectly_cut = false;
-        let cut_suggestions_list = start_cuts_opti_v2::find_best_possible_cuts(
-            &filtered_dfg,
-            &disjoint_activities,
-            &start_acts,
-            &end_acts,
-        );
-        response.cut_suggestions_list = cut_suggestions_list;
-    } else {
-        info!("No disjoint activities found in the OCPT");
-    }
-
-    let elapsed = start_time.elapsed();
-    println!("Time taken to form process_forest: {:.2?}", elapsed);
-
-    // println!("=== Object list === num: {}", all_object_types.len());
-    // for object in &all_object_types {
-    //     println!("{}", object);
-    // }
-
-    // println!("=== Activity list === num: {}", all_activities.len());
-    // for activity in &all_activities {
-    //     println!("{}", activity);
-    // }
-
-    // println!("\nStart Activities: {:?}", start_acts);
-    // println!("End Activities: {:?}", end_acts);
-
-    // println!("\n=== Process Forest ===");
-    // print_process_forest(&process_forest);
 }
 
 fn log_sorted_map<T: std::fmt::Debug + Ord, U: std::fmt::Debug>(

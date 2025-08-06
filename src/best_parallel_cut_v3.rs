@@ -4,10 +4,10 @@ pub fn best_parallel_cut_v3(
     dfg: &HashMap<(String, String), usize>,
     all_activities: &HashSet<String>,
     cost_to_add_edge: &usize
-) -> (usize, usize, Vec<(String, String)>, HashSet<String>, HashSet<String>, HashMap<(String, String), usize>) {
+) -> (usize, usize, Vec<(String, String, usize)>, HashSet<String>, HashSet<String>, HashMap<(String, String), usize>) {
     let mut min_cost = usize::MAX;
     let mut best_no_of_added_edges = 0;
-    let mut best_added_edges: Vec<(String, String)> = Vec::new();
+    let mut best_added_edges: Vec<(String, String, usize)> = Vec::new();
     let mut best_set1: HashSet<String> = HashSet::new();
     let mut best_set2: HashSet<String> = HashSet::new();
     let mut best_new_dfg: HashMap<(String, String), usize> = HashMap::new();
@@ -25,7 +25,7 @@ pub fn best_parallel_cut_v3(
             
             // Run max flow / min cut algorithm: uses Ford-Fulkerson with BFS (Edmonds-Karp) to find the minimum cut
             let (max_flow_value, cut_set1, cut_set2, added_edges) = 
-                max_flow_min_cut(&missing_dfg, &edge_to_missing_map, all_activities, source, sink);
+                max_flow_min_cut(&missing_dfg, &edge_to_missing_map, all_activities, source, sink, cost_to_add_edge);
             
             let cost = max_flow_value;
             let no_of_added_edges = added_edges.len();
@@ -40,7 +40,7 @@ pub fn best_parallel_cut_v3(
                 
                 // Create new DFG with added edges
                 best_new_dfg = dfg.clone();
-                for (a, b) in &added_edges {
+                for (a, b, _cost) in &added_edges {
                     best_new_dfg.insert((a.clone(), b.clone()), 1);
                 }
             }
@@ -101,8 +101,9 @@ fn max_flow_min_cut(
     edge_to_missing_map: &HashMap<(String, String), Vec<(String, String)>>,
     all_activities: &HashSet<String>,
     source: &String,
-    sink: &String
-) -> (usize, HashSet<String>, HashSet<String>, Vec<(String, String)>) {
+    sink: &String,
+    cost_to_add_edge: &usize
+) -> (usize, HashSet<String>, HashSet<String>, Vec<(String, String, usize)>) {
     
     // Create adjacency list representation
     let mut graph = HashMap::new();
@@ -178,7 +179,7 @@ fn max_flow_min_cut(
     }
     
     // Find edges that need to be added (cut edges)
-    let mut added_edges = Vec::new();
+    let mut added_edges: Vec<(String, String, usize)> = Vec::new();
     for activity1 in &set1 {
         for activity2 in &set2 {
             // Check both possible orderings since we stored undirected edges as (min, max)
@@ -195,7 +196,7 @@ fn max_flow_min_cut(
                     // Check if this edge crosses the cut
                     if (set1.contains(from) && set2.contains(to)) || 
                        (set2.contains(from) && set1.contains(to)) {
-                        added_edges.push((from.clone(), to.clone()));
+                        added_edges.push((from.clone(), to.clone(), *cost_to_add_edge));
                     }
                 }
             }

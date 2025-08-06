@@ -7,12 +7,12 @@ pub fn best_sequence_cut(
     dfg: &HashMap<(String, String), usize>, 
     all_activities: &HashSet<String>,
     cost_to_add_edge: &usize
-) -> (usize, usize, Vec<(String, String)>, usize, Vec<(String, String)>, HashSet<String>, HashSet<String>, HashMap<(String, String), usize>) {
+) -> (usize, usize, Vec<(String, String, usize)>, usize, Vec<(String, String, usize)>, HashSet<String>, HashSet<String>, HashMap<(String, String), usize>) {
     let mut min_cost = usize::MAX;
     let mut best_no_of_cut_edges = 0;
-    let mut best_cut_edges: Vec<(String, String)> = Vec::new();
+    let mut best_cut_edges: Vec<(String, String, usize)> = Vec::new();
     let mut best_no_of_added_edges = 0;
-    let mut best_added_edges: Vec<(String, String)> = Vec::new();
+    let mut best_added_edges: Vec<(String, String, usize)> = Vec::new();
     let mut best_set1: HashSet<String> = HashSet::new();
     let mut best_set2: HashSet<String> = HashSet::new();
     let mut best_size_diff = usize::MAX;
@@ -43,7 +43,12 @@ pub fn best_sequence_cut(
                 
                 // create a new dfg and delete the edges in cut_edges
                 let mut new_dfg: HashMap<(String, String), usize> = dfg.clone();
+                let mut cut_edges_with_cost: Vec<(String, String, usize)> = Vec::new();
+                
                 for (from, to) in &cut_edges {
+                    // Get the cost from the original DFG before removing
+                    let edge_cost = dfg.get(&(from.clone(), to.clone())).copied().unwrap_or(0);
+                    cut_edges_with_cost.push((from.clone(), to.clone(), edge_cost));
                     new_dfg.remove(&(from.clone(), to.clone()));
                 }
                 
@@ -73,7 +78,7 @@ pub fn best_sequence_cut(
                 }
 
                 let mut total_cost = cost;
-                let mut added_edges: Vec<(String, String)> = Vec::new();
+                let mut added_edges: Vec<(String, String, usize)> = Vec::new();
                 let mut no_of_added_edges = 0;
 
                 // Adding necessary edges
@@ -84,7 +89,7 @@ pub fn best_sequence_cut(
                             let edge = (s1.clone(), s2.clone());
                             new_dfg.insert(edge, cost_to_add_edge.clone());
                             total_cost += cost_to_add_edge;
-                            added_edges.push((s1.clone(), s2.clone()));
+                            added_edges.push((s1.clone(), s2.clone(), *cost_to_add_edge));
                             no_of_added_edges += 1;
                         }
                     }
@@ -112,7 +117,7 @@ pub fn best_sequence_cut(
                 if should_update {
                     min_cost = total_cost;
                     best_no_of_cut_edges = min_cut;
-                    best_cut_edges = cut_edges;
+                    best_cut_edges = cut_edges_with_cost;
                     best_no_of_added_edges = no_of_added_edges;
                     best_added_edges = added_edges;
                     best_set1 = set1;

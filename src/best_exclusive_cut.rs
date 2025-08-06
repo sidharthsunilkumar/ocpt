@@ -136,7 +136,7 @@ impl Graph {
 pub fn best_exclusive_cut(
     dfg: &HashMap<(String, String), usize>,
     all_activities: &HashSet<String>,
-) -> (usize, Vec<(String, String)>, HashSet<String>, HashSet<String>, HashMap<(String, String), usize>) {
+) -> (usize, Vec<(String, String, usize)>, HashSet<String>, HashSet<String>, HashMap<(String, String), usize>) {
 
     //info!("Starting best_exclusive_cut...");
     if all_activities.len() < 2 {
@@ -145,7 +145,7 @@ pub fn best_exclusive_cut(
     
     let activities: Vec<String> = all_activities.iter().cloned().collect();
     let mut min_cost = usize::MAX;
-    let mut best_cut_edges = Vec::new();
+    let mut best_cut_edges: Vec<(String, String, usize)> = Vec::new();
     let mut best_set1 = HashSet::new();
     let mut best_set2 = HashSet::new();
     
@@ -213,7 +213,7 @@ pub fn best_exclusive_cut(
             }
             
             // Calculate actual cut cost from original DFG
-            let mut cut_edges = Vec::new();
+            let mut cut_edges: Vec<(String, String, usize)> = Vec::new();
             let mut total_cut_cost = 0;
             
             for ((from, to), cost) in dfg {
@@ -221,7 +221,7 @@ pub fn best_exclusive_cut(
                 let to_in_set1 = set1.contains(to);
                 
                 if from_in_set1 != to_in_set1 {
-                    cut_edges.push((from.clone(), to.clone()));
+                    cut_edges.push((from.clone(), to.clone(), *cost));
                     total_cut_cost += cost;
                 }
             }
@@ -241,7 +241,7 @@ pub fn best_exclusive_cut(
     
     // Create new DFG with cut edges removed
     let mut new_dfg = dfg.clone();
-    for (from, to) in &best_cut_edges {
+    for (from, to, _cost) in &best_cut_edges {
         new_dfg.remove(&(from.clone(), to.clone()));
     }
     

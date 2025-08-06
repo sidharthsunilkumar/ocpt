@@ -29,10 +29,17 @@ pub fn cost_of_adding_edge(dfg: &HashMap<(String, String), usize>) -> usize {
     // Estimate of unseen edges
     let q0 = s_chao2 - s_obs as f64;
 
-    let est_cost: usize = (q1 as f64 / q0 as f64).ceil() as usize; //round up
+    let est_cost: usize = if q0 > 0.0 {
+        (q1 as f64 / q0 as f64).ceil() as usize
+    } else {
+        1 // Default to 1 if q0 is 0 or negative
+    };
 
-    println!("Cost to add; s_obs: {}, q1: {}, q2: {}, n: {}, s_chao2: {}, q0: {}, est_cost: {}\n", 
-          s_obs, q1, q2, n, s_chao2, q0, est_cost);
+    // Ensure minimum cost is 1
+    let final_cost = est_cost.max(1);
+
+    println!("Cost to add; s_obs: {}, q1: {}, q2: {}, n: {}, s_chao2: {}, q0: {}, est_cost: {}, final_cost: {}\n", 
+          s_obs, q1, q2, n, s_chao2, q0, est_cost, final_cost);
     
-    est_cost
+    final_cost
 }

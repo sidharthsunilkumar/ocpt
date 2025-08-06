@@ -315,6 +315,10 @@ pub fn find_best_possible_cuts(
     start_activities: &HashSet<String>,
     end_activities: &HashSet<String>,
 ) -> CutSuggestionsList{
+
+    println!("Finding best possible cuts for all activities: {:?}", all_activities);
+    println!("--------------------");
+
     let filtered_dfg = filter_keep_dfg(&dfg, &all_activities);
     let (start_activities, end_activities) =
         get_start_and_end_activities(&dfg, &all_activities, &start_activities, &end_activities);
@@ -324,17 +328,19 @@ pub fn find_best_possible_cuts(
         all_activities
     );
 
+    println!("Filtered DFG: {:?}", filtered_dfg);
+
     let mut cuts: Vec<CutSuggestion> = Vec::new();
 
     let mut cost_to_add_edge: usize = cost_of_adding_edge(&filtered_dfg);
 
-    info!("Checking for best possible exclusive cut...");
-    let (be_min_cost, be_cut_edges, be_set1, be_set2, be_new_dfg) = best_exclusive_cut(&dfg, &all_activities);
-    info!("\n=== BEST EXCLUSIVE CUT RESULTS ===");
-    info!("Minimum Cost: {}", be_min_cost);
-    info!("Cut Edges: {:?}", be_cut_edges);
-    info!("Set 1: {:?}", be_set1);
-    info!("Set 2: {:?}", be_set2);
+    println!("Checking for best possible exclusive cut...");
+    let (be_min_cost, be_cut_edges, be_set1, be_set2, be_new_dfg) = best_exclusive_cut(&filtered_dfg, &all_activities);
+    println!("\n=== BEST EXCLUSIVE CUT RESULTS ===");
+    println!("Minimum Cost: {}", be_min_cost);
+    println!("Cut Edges: {:?}", be_cut_edges);
+    println!("Set 1: {:?}", be_set1);
+    println!("Set 2: {:?}", be_set2);
     let (is_exclusive, be_failures) = exclusive_cut_condition_check(&be_new_dfg, &be_set1, &be_set2);
     if(!is_exclusive) {
         // I dont think this is possible, but just in case
@@ -410,7 +416,7 @@ pub fn find_best_possible_cuts(
         bp_set1,
         bp_set2,
         bp_new_dfg,
-    ) = best_parallel_cut_v3(&dfg, &all_activities, &cost_to_add_edge);
+    ) = best_parallel_cut_v3(&filtered_dfg, &all_activities, &cost_to_add_edge);
     println!("\n=== BEST PARALLEL CUT RESULTS mine cl ===");
     println!("Minimum cost: {}", bp_min_cost);
     println!("Total Number of Edges to Add: {:?}", bp_no_of_added_edges);
@@ -430,26 +436,29 @@ pub fn find_best_possible_cuts(
     info!("Checking for best redo cut...");
     let (br_is_redo, br_min_cost, br_edges_removed, br_edges_added, br_cost_of_added_edges, br_cost_of_removed_edges, br_set1, br_set2, br_new_dfg) =
         best_redo_cut(&filtered_dfg, &all_activities, &start_activities, &end_activities, &cost_to_add_edge);
-
-    info!("\n=== BEST REDO CUT RESULTS ===");
-    info!("Is Redo Cut Possible: {}", br_is_redo);
-    info!("Minimum Cost: {}", br_min_cost);
-    info!("Edges Removed: {:?}", br_edges_removed);
-    info!("Edges Added: {:?}", br_edges_added);
-    info!("Cost of Added Edges: {}", br_cost_of_added_edges);
-    info!("Cost of Removed Edges: {}", br_cost_of_removed_edges);
-    info!("Set 1: {:?}", br_set1);
-    info!("Set 2: {:?}", br_set2);
-    // info!("new dfg: {:?}", br_new_dfg);
-    cuts.push(CutSuggestion {
-        cut_type: "redo".to_string(),
-        set1: br_set1,
-        set2: br_set2,
-        edges_to_be_added: br_edges_added,
-        edges_to_be_removed: br_edges_removed,
-        cost_to_add_edge: cost_to_add_edge,
-        total_cost: br_min_cost,
-    });
+    if(br_is_redo) {
+        info!("\n=== BEST REDO CUT RESULTS ===");
+        info!("Is Redo Cut Possible: {}", br_is_redo);
+        info!("Minimum Cost: {}", br_min_cost);
+        info!("Edges Removed: {:?}", br_edges_removed);
+        info!("Edges Added: {:?}", br_edges_added);
+        info!("Cost of Added Edges: {}", br_cost_of_added_edges);
+        info!("Cost of Removed Edges: {}", br_cost_of_removed_edges);
+        info!("Set 1: {:?}", br_set1);
+        info!("Set 2: {:?}", br_set2);
+        // info!("new dfg: {:?}", br_new_dfg);
+        cuts.push(CutSuggestion {
+            cut_type: "redo".to_string(),
+            set1: br_set1,
+            set2: br_set2,
+            edges_to_be_added: br_edges_added,
+            edges_to_be_removed: br_edges_removed,
+            cost_to_add_edge: cost_to_add_edge,
+            total_cost: br_min_cost,
+        });
+    } else {
+        info!("No best redo cut found");
+    }
 
      // Create the final result structure
     let cut_suggestions_list: CutSuggestionsList = CutSuggestionsList {
