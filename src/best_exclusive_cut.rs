@@ -230,7 +230,9 @@ pub fn best_exclusive_cut(
             //info!("Set1: {:?}, Set2: {:?}", set1, set2);
             
             // Update best solution
-            if total_cut_cost < min_cost {
+            let current_size_diff = set1.len().abs_diff(set2.len());
+            let best_size_diff = best_set1.len().abs_diff(best_set2.len());
+            if total_cut_cost < min_cost || (total_cut_cost == min_cost && current_size_diff < best_size_diff) {
                 min_cost = total_cut_cost;
                 best_cut_edges = cut_edges;
                 best_set1 = set1;

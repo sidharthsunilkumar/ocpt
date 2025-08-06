@@ -14,7 +14,7 @@ pub fn best_parallel_cut_v3(
     
     // Create missing_dfg - undirected graph with costs for missing edges
     let (missing_dfg, edge_to_missing_map) = create_missing_dfg(dfg, all_activities, cost_to_add_edge);
-    
+
     // Try each activity as a potential source for min-cut
     let activities: Vec<String> = all_activities.iter().cloned().collect();
     
@@ -31,7 +31,9 @@ pub fn best_parallel_cut_v3(
             let no_of_added_edges = added_edges.len();
             
             // Update best solution if this is better
-            if cost < min_cost {
+            let current_size_diff = cut_set1.len().abs_diff(cut_set2.len());
+            let best_size_diff = best_set1.len().abs_diff(best_set2.len());
+            if cost < min_cost || (cost == min_cost && current_size_diff < best_size_diff) {
                 min_cost = cost;
                 best_no_of_added_edges = no_of_added_edges;
                 best_added_edges = added_edges.clone();
@@ -46,7 +48,7 @@ pub fn best_parallel_cut_v3(
             }
         }
     }
-    
+
     (min_cost, best_no_of_added_edges, best_added_edges, best_set1, best_set2, best_new_dfg)
 }
 

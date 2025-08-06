@@ -306,16 +306,16 @@ pub fn find_best_possible_cuts(
         bp_added_edges,
         bp_set1,
         bp_set2,
-        _bp_new_dfg,
+        bp_new_dfg,
     ) = best_parallel_cut_v3(&filtered_dfg, &all_activities, &cost_to_add_edge);
     if bp_set1.is_empty() || bp_set2.is_empty() {
-        info!("Best parallel cut possible condition failed: one of the sets is empty");
+        println!("Best parallel cut possible condition failed: one of the sets is empty");
     } else {
-        let (parallel_condition_passed, _parallel_failures) = parallel_cut_condition_check(&filtered_dfg, &bp_set1, &bp_set2, &start_activities, &end_activities);
+        let (parallel_condition_passed, _parallel_failures) = parallel_cut_condition_check(&bp_new_dfg, &bp_set1, &bp_set2, &start_activities, &end_activities);
         if !parallel_condition_passed {
-            info!("Parallel cut condition failed for sets: {:?} and {:?}", bp_set1, bp_set2);
+            println!("Parallel cut condition failed for sets: {:?} and {:?}", bp_set1, bp_set2);
             for (a, b, r1, r2) in _parallel_failures {
-                info!("Condition failure: {} -> {} (reachable: {}, {})", a, b, r1, r2);
+                println!("Condition failure: {} -> {} (reachable: {}, {})", a, b, r1, r2);
             }
         } else {
             println!("\n=== BEST PARALLEL CUT RESULTS ===");
@@ -336,14 +336,14 @@ pub fn find_best_possible_cuts(
     }
 
     println!("Checking for best redo cut...");
-    let (br_is_redo, br_min_cost, br_edges_removed, br_edges_added, br_cost_of_added_edges, br_cost_of_removed_edges, br_set1, br_set2, _br_new_dfg) =
+    let (br_is_redo, br_min_cost, br_edges_removed, br_edges_added, br_cost_of_added_edges, br_cost_of_removed_edges, br_set1, br_set2, br_new_dfg) =
         best_redo_cut(&filtered_dfg, &all_activities, &start_activities, &end_activities, &cost_to_add_edge);
     if br_is_redo {
         if br_set1.is_empty() || br_set2.is_empty() {
             info!("Best redo cut possible condition failed: one of the sets is empty");
         } else {
             let (redo_condition_passed, _redo_failures) = redo_cut_condition_check(
-                &filtered_dfg,
+                &br_new_dfg,
                 &br_set1,
                 &br_set2,
                 &start_activities,
@@ -782,7 +782,7 @@ fn parallel_cut_condition_check(
             let r1 = dfg.contains_key(&(a.clone(), b.clone()));
             let r2 = dfg.contains_key(&(b.clone(), a.clone()));
             if !(r1 && r2) {
-                failures.push((a.clone(), b.clone(), r1, r2));
+                failures.push((a.clone(), b.clone(), r1, r2));                
             }
         }
     }

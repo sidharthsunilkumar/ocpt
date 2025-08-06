@@ -62,10 +62,14 @@ async fn getInitialResponse() -> Json<Value> {
     println!("Starting...");
 
     // Changed to use OCEL 2.0 format
-    let file_name ="order-management";
-    let file_path = "data/order-management.json";
+    // let file_name ="order-management";
+    // let file_path = "data/order-management.json";
     // let file_name ="ContainerLogistics";
     // let file_path = "data/ContainerLogistics.json";
+    let file_name ="ocel2-p2p";
+    let file_path = "data/ocel2-p2p.json";
+    // let file_name ="age_of_empires_ocel2";
+    // let file_path = "data/age_of_empires_ocel2.json";
 
     let file_content = stdfs::read_to_string(&file_path).unwrap();
     let ocel: OcelJson = serde_json::from_str(&file_content).unwrap();
@@ -92,9 +96,9 @@ async fn getInitialResponse() -> Json<Value> {
 
     print_dfg(&dfg);
 
-    // let remove_list = vec![];
+    let remove_list = vec![];
     // let remove_list = vec!["failed delivery".to_string(),"payment reminder".to_string()];
-    let remove_list = vec!["reopened".to_string()];
+    // let remove_list = vec!["reopened".to_string()];
     let filtered_dfg = filter_dfg(&dfg, &remove_list);
     let filtered_activities = filter_activities(&all_activities, &remove_list);
 

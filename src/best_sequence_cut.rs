@@ -102,19 +102,7 @@ pub fn best_sequence_cut(
                 let size_diff = (set1.len() as isize - set2.len() as isize).abs() as usize;
                 
                 // Update best solution if this one is better
-                let should_update = if total_cost < min_cost {
-                    true
-                } else if total_cost == min_cost {
-                    if size_diff < best_size_diff {
-                        true
-                    } else {
-                        false // if size_diff is also same, keep the first one
-                    }
-                } else {
-                    false
-                };
-                
-                if should_update {
+                if total_cost < min_cost || (total_cost == min_cost && size_diff < best_size_diff) {
                     min_cost = total_cost;
                     best_no_of_cut_edges = min_cut;
                     best_cut_edges = cut_edges_with_cost;
