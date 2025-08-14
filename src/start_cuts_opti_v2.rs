@@ -6,6 +6,7 @@ use crate::best_parallel_cut_v3::best_parallel_cut_v3;
 use crate::best_redo_cuts::best_redo_cut;
 use crate::best_sequence_cut::best_sequence_cut;
 use crate::best_sequence_cut_v2;
+use crate::cost_to_add::compute_missing_edge_costs;
 use crate::cost_to_add::cost_of_adding_edge;
 use crate::cost_to_cut::is_reachable;
 use crate::cost_to_cut::to_be_non_reachable;
@@ -216,6 +217,12 @@ pub fn find_best_possible_cuts(
     let mut cuts: Vec<CutSuggestion> = Vec::new();
 
     let mut cost_to_add_edge: usize = cost_of_adding_edge(&filtered_dfg);
+
+    let test_added_edges = compute_missing_edge_costs(&filtered_dfg);
+    // print the test added edges line by line
+    for ((from, to), cost) in &test_added_edges {
+        println!("Edge to be added: {} -> {} with cost {}", from, to, cost);
+    }
 
     println!("Checking for best possible exclusive cut...");
     let (be_min_cost, be_cut_edges, be_set1, be_set2, be_new_dfg) = best_exclusive_cut(&filtered_dfg, &all_activities);
