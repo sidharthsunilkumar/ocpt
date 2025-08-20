@@ -1,17 +1,16 @@
-use serde::Deserialize;
-use std::collections::{HashMap, HashSet};
-use crate::types::{Event, Object};
+use std::collections::HashMap;
+use crate::types::{OCELEvent, OCELObject};
 
 
 
 pub fn build_relations(
-    events: &Vec<Event>,
-    objects: &Vec<Object>,
+    events: &Vec<OCELEvent>,
+    objects: &Vec<OCELObject>,
 ) -> Vec<(String, String, String, String, String)> {
     let mut relations = Vec::new();
 
     // Create a HashMap for quick object lookup
-    let object_map: HashMap<String, &Object> = objects.iter()
+    let object_map: HashMap<String, &OCELObject> = objects.iter()
         .map(|obj| (obj.id.clone(), obj))
         .collect();
 
@@ -20,8 +19,8 @@ pub fn build_relations(
             if let Some(object) = object_map.get(&relationship.object_id) {
                 relations.push((
                     event.id.clone(),
-                    event.activity.clone(),
-                    event.time.clone(),
+                    event.event_type.clone(),
+                    event.time.to_rfc3339(),
                     relationship.object_id.clone(),
                     object.object_type.clone(),
                 ));

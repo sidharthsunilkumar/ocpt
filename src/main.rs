@@ -1,5 +1,5 @@
 use crate::format_conversion::{from_json_value, json_to_dfg, json_to_process_forest, process_forest_to_json};
-use crate::types::{APIResponse, CutSelectedAPIRequest, CutSuggestion, CutSuggestionsList, Event, Object, OcelJson, ProcessForest, TreeNode};
+use crate::types::{APIResponse, CutSelectedAPIRequest, CutSuggestion, CutSuggestionsList, OCEL, ProcessForest, TreeNode};
 use serde::Deserialize;
 use simplelog::*;
 use std::collections::{HashMap, HashSet};
@@ -72,7 +72,7 @@ async fn getInitialResponse() -> Json<Value> {
     // let file_path = "data/age_of_empires_ocel2.json";
 
     let file_content = stdfs::read_to_string(&file_path).unwrap();
-    let ocel: OcelJson = serde_json::from_str(&file_content).unwrap();
+    let ocel: OCEL = serde_json::from_str(&file_content).unwrap();
 
     let relations = build_relations_fns::build_relations(&ocel.events, &ocel.objects);
     // println!("size of relations: {}", relations.len());
