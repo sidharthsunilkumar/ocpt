@@ -7,6 +7,9 @@ pub fn build_relations(
     events: &Vec<OCELEvent>,
     objects: &Vec<OCELObject>,
 ) -> Vec<(String, String, String, String, String)> {
+
+    // Format (event_id, event_type, timestamp, object_id, object_type)
+
     let mut relations = Vec::new();
 
     // Create a HashMap for quick object lookup

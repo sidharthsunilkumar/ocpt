@@ -11,6 +11,7 @@ use std::sync::Arc;
 mod build_relations_fns;
 mod divergence_free_dfg;
 mod format_conversion;
+mod get_dfg_by_object_type;
 mod interaction_patterns;
 mod start_cuts;
 mod start_cuts_opti_v1;
@@ -28,7 +29,9 @@ mod best_sequence_cut_v2;
 mod cost_to_add;
 mod cost_to_cut;
 mod good_cuts;
+use crate::cost_to_add::cost_of_adding_edge_by_object_type;
 use axum::extract::Json as AxumJson;
+use axum::extract::Path;
 use axum::http::StatusCode;
 
 //For REST API server
@@ -79,6 +82,30 @@ async fn getInitialResponse() -> Json<Value> {
 
     let (div, con, rel, defi, all_activities, all_object_types) =
         interaction_patterns::get_interaction_patterns(&relations, &ocel);
+
+    // Get DFGs by object type
+    let dfg_sets = get_dfg_by_object_type::get_dfg_by_object_type(&relations, &div);
+
+    // print first 5 relations tuple
+    println!("First 5 relations:");
+    for relation in &relations[..5] {
+        println!("{:?}", relation);
+    }
+    //print div
+    println!("Divergent: {:?}", div);
+
+    // Print information about DFGs by object type
+    println!("DFGs by object type:");
+    for (otype, (dfg_otype, start_acts_otype, end_acts_otype)) in &dfg_sets {
+        println!("\nObject Type: {}", otype);
+        println!("Number of edges in DFG: {}", dfg_otype.len());
+        println!("Start activities: {:?}", start_acts_otype);
+        println!("End activities: {:?}", end_acts_otype);
+        if !dfg_otype.is_empty() {
+            println!("DFG edges:");
+            print_dfg(dfg_otype);
+        }
+    }
 
     // println!("Divergent: {:?}",div);
     // println!("Convergent: {:?}",con);
@@ -169,10 +196,90 @@ async fn getInitialResponse() -> Json<Value> {
     Json(serde_json::to_value(response).unwrap())
 }
 
+async fn testCostToAddEdge(Path(file_name): Path<String>) -> Json<Value> {
+    println!("testCostToAddEdge called with file_name: {}", file_name);
+    println!("Starting...");
+
+    // Changed to use OCEL 2.0 format - now using the file_name parameter
+    let file_path = format!("data/{}.json", file_name);
+    println!("Constructed file_path: {}", file_path);
+
+    let file_content = stdfs::read_to_string(&file_path).unwrap();
+    let ocel: OCEL = serde_json::from_str(&file_content).unwrap();
+
+    let relations = build_relations_fns::build_relations(&ocel.events, &ocel.objects);
+
+    let (div, _con, _rel, _defi, _all_activities, _all_object_types) =
+        interaction_patterns::get_interaction_patterns(&relations, &ocel);
+
+    // Get DFGs by object type
+    let dfg_sets = get_dfg_by_object_type::get_dfg_by_object_type(&relations, &div);
+
+    let (dfg, _start_acts, _end_acts) =
+        divergence_free_dfg::get_divergence_free_graph_v2(&relations, &div);
+
+    println!("created DFG!");
+
+    // Call cost_of_adding_edge_by_object_type function
+    let (missing_edge_dfg, probability_of_missing_edge, rarity_score, normalised_rarity_score) = cost_of_adding_edge_by_object_type(&dfg, &dfg_sets);
+
+    // Create response with dfg, dfg_sets, and missing_edge_dfg
+    let mut response_data = serde_json::Map::new();
+    
+    // Convert dfg to JSON format
+    let dfg_json: Value = format_conversion::dfg_to_json(&dfg);
+    response_data.insert("dfg".to_string(), dfg_json);
+    
+    // Convert dfg_sets to JSON format with custom serialization
+    let mut dfg_sets_json = serde_json::Map::new();
+    for (object_type, (dfg_otype, start_acts, end_acts)) in &dfg_sets {
+        let mut object_data = serde_json::Map::new();
+        
+        // Convert the DFG to JSON format
+        let dfg_otype_json: Value = format_conversion::dfg_to_json(dfg_otype);
+        object_data.insert("dfg".to_string(), dfg_otype_json);
+        
+        // Convert HashSets to Vec for JSON serialization
+        let start_acts_vec: Vec<String> = start_acts.iter().cloned().collect();
+        let end_acts_vec: Vec<String> = end_acts.iter().cloned().collect();
+        
+        object_data.insert("start_activities".to_string(), serde_json::to_value(start_acts_vec).unwrap());
+        object_data.insert("end_activities".to_string(), serde_json::to_value(end_acts_vec).unwrap());
+        
+        dfg_sets_json.insert(object_type.clone(), Value::Object(object_data));
+    }
+    response_data.insert("dfg_sets".to_string(), Value::Object(dfg_sets_json));
+    
+    // Convert missing_edge_dfg to JSON format
+    let missing_edge_dfg_json: Value = format_conversion::dfg_to_json(&missing_edge_dfg);
+    response_data.insert("missing_edge_dfg".to_string(), missing_edge_dfg_json);
+
+    // Add the additional data structures
+    response_data.insert("probability_of_missing_edge".to_string(), Value::Number(serde_json::Number::from_f64(probability_of_missing_edge).unwrap_or(serde_json::Number::from(0))));
+    
+    // Convert rarity_score to JSON format with string keys
+    let mut rarity_score_json = serde_json::Map::new();
+    for ((a, b), score) in &rarity_score {
+        let key = format!("{}→{}", a, b);
+        rarity_score_json.insert(key, Value::Number(serde_json::Number::from_f64(*score).unwrap_or(serde_json::Number::from(0))));
+    }
+    response_data.insert("rarity_score".to_string(), Value::Object(rarity_score_json));
+    
+    // Convert normalised_rarity_score to JSON format with string keys
+    let mut normalised_rarity_score_json = serde_json::Map::new();
+    for ((a, b), score) in &normalised_rarity_score {
+        let key = format!("{}→{}", a, b);
+        normalised_rarity_score_json.insert(key, Value::Number(serde_json::Number::from_f64(*score).unwrap_or(serde_json::Number::from(0))));
+    }
+    response_data.insert("normalised_rarity_score".to_string(), Value::Object(normalised_rarity_score_json));
+
+    Json(Value::Object(response_data))
+}
+
 // Handler for POST /cut-selected
 async fn cut_selected_handler(
     AxumJson(payload): AxumJson<CutSelectedAPIRequest>,
-) -> (Json<Value>) {
+) -> Json<Value> {
     println!("Received cut-selected request: {:?}", payload.cut_selected);
 
     let mut ocpt: ProcessForest = from_json_value(&payload.ocpt);
@@ -358,12 +465,19 @@ async fn main() {
         .allow_origin(Any)
         .allow_headers(Any);
 
+    println!("Configuring routes...");
     let app = Router::new()
         .route("/", get(getInitialResponse))
         .route("/dfg", get(hello))
+        .route("/test-cost-to-add-edge/:file_name", get(testCostToAddEdge))
         .route("/cut-selected", axum::routing::post(cut_selected_handler))
         .layer(cors);
     
+    println!("Routes configured:");
+    println!("  GET /");
+    println!("  GET /dfg");
+    println!("  GET /test-cost-to-add-edge/:file_name");
+    println!("  POST /cut-selected");
     println!("Server running on http://localhost:1080");
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:1080").await.unwrap();
