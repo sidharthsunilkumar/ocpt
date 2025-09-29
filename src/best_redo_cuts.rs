@@ -1,5 +1,5 @@
 use std::collections::{HashMap, HashSet};
-use crate::cost_to_cut::is_reachable;
+use crate::{cost_to_add, cost_to_cut::is_reachable};
 use log::info;
 
 // Returns:
@@ -17,7 +17,7 @@ pub fn best_redo_cut(
     all_activities: &HashSet<String>,
     start_activities: &HashSet<String>,
     end_activities: &HashSet<String>,
-    cost_to_add_edge: &usize
+    cost_to_add_edges: &HashMap<(String, String), f64>
 ) -> (bool, usize, Vec<(String, String, usize)>, Vec<(String, String, usize)>, usize, usize, HashSet<String>, HashSet<String>, HashMap<(String, String), usize>) {
 
     let mut set1: HashSet<String> = HashSet::new();
@@ -143,15 +143,15 @@ pub fn best_redo_cut(
                 edges_removed.extend(removed_edges);
             } else  {
                 // Step 7.2: Both become invalid or valid, try both cases
-                let (cost1, dfg1, removed_edges1, added_edges1) = try_case_add_to_set1_new(&x, &current_dfg, start_activities, end_activities, &set1, &set2, cost_to_add_edge);
-                let (cost2, dfg2, removed_edges2, added_edges2) = try_case_add_to_set2_new(&x, &current_dfg, start_activities, end_activities, &set1, &set2, cost_to_add_edge);
+                let (cost1, dfg1, removed_edges1, added_edges1) = try_case_add_to_set1_new(&x, &current_dfg, start_activities, end_activities, &set1, &set2, cost_to_add_edges);
+                let (cost2, dfg2, removed_edges2, added_edges2) = try_case_add_to_set2_new(&x, &current_dfg, start_activities, end_activities, &set1, &set2, cost_to_add_edges);
                 
                 if cost1 < cost2 {
                     set1.insert(x.clone());
                     current_dfg = dfg1;
                     total_cost += cost1;
                     // Calculate the costs from the returned values
-                    let add_cost1 = added_edges1.len() * cost_to_add_edge;
+                    let add_cost1 = added_edges1.iter().map(|(s, e, c)| *c as usize).sum::<usize>();
                     let remove_cost1 = cost1 - add_cost1;
                     cost_of_edges_added += add_cost1;
                     cost_of_edges_removed += remove_cost1;
@@ -162,7 +162,7 @@ pub fn best_redo_cut(
                     current_dfg = dfg2;
                     total_cost += cost2;
                     // Calculate the costs from the returned values
-                    let add_cost2 = added_edges2.len() * cost_to_add_edge;
+                    let add_cost2 = added_edges2.iter().map(|(s, e, c)| *c as usize).sum::<usize>();
                     let remove_cost2 = cost2 - add_cost2;
                     cost_of_edges_added += add_cost2;
                     cost_of_edges_removed += remove_cost2;
@@ -289,7 +289,7 @@ fn add_edges_for_redo(
     start_activities: &HashSet<String>,
     end_activities: &HashSet<String>,
     activity_x: &String,
-    cost_to_add_edge: &usize
+    cost_to_add_edges: &HashMap<(String, String), f64>
 ) -> (HashMap<(String, String), usize>, Vec<(String, String, usize)>, usize) {
     let mut new_dfg = dfg.clone();
     let mut edges_added: Vec<(String, String, usize)> = Vec::new();
@@ -321,9 +321,11 @@ fn add_edges_for_redo(
                     let edge_exists = new_dfg.contains_key(&(c.clone(), d.clone()));
                     
                     if should_add && !edge_exists {
-                        new_dfg.insert((c.clone(), d.clone()), *cost_to_add_edge);
-                        edges_added.push((c.clone(), d.clone(), *cost_to_add_edge));
-                        total_cost += cost_to_add_edge;
+                        let cost_to_add_edge = cost_to_add_edges.get(&(c.clone(), d.clone())).copied().unwrap_or(999999.0);
+                        let cost_to_add_edge_usize = cost_to_add_edge as usize;
+                        new_dfg.insert((c.clone(), d.clone()), cost_to_add_edge_usize);
+                        edges_added.push((c.clone(), d.clone(), cost_to_add_edge_usize));
+                        total_cost += cost_to_add_edge_usize;
                     }
                 }
             }
@@ -341,13 +343,13 @@ fn try_case_add_to_set1_new(
     end_activities: &HashSet<String>,
     set1: &HashSet<String>,
     set2: &HashSet<String>,
-    cost_to_add_edge: &usize
+    cost_to_add_edges: &HashMap<(String, String), f64>
 ) -> (usize, HashMap<(String, String), usize>, Vec<(String, String, usize)>, Vec<(String, String, usize)>) {
     let mut test_set1 = set1.clone();
     test_set1.insert(x.clone());
     
     // Add edges using the new function
-    let (dfg_with_added, added_edges, add_cost) = add_edges_for_redo(dfg, set2, start_activities, end_activities, x, cost_to_add_edge);
+    let (dfg_with_added, added_edges, add_cost) = add_edges_for_redo(dfg, set2, start_activities, end_activities, x, cost_to_add_edges);
     
     // Remove edges
     let (final_dfg, remove_cost, removed_edges) = remove_edges_for_redo(start_activities, end_activities, &dfg_with_added, &test_set1, set2);
@@ -363,13 +365,13 @@ fn try_case_add_to_set2_new(
     end_activities: &HashSet<String>,
     set1: &HashSet<String>,
     set2: &HashSet<String>,
-    cost_to_add_edge: &usize
+    cost_to_add_edges: &HashMap<(String, String), f64>
 ) -> (usize, HashMap<(String, String), usize>, Vec<(String, String, usize)>, Vec<(String, String, usize)>) {
     let mut test_set2 = set2.clone();
     test_set2.insert(x.clone());
     
     // Add edges using the new function
-    let (dfg_with_added, added_edges, add_cost) = add_edges_for_redo(dfg, set1, start_activities, end_activities, x, cost_to_add_edge);
+    let (dfg_with_added, added_edges, add_cost) = add_edges_for_redo(dfg, set1, start_activities, end_activities, x, cost_to_add_edges);
     
     // Remove edges
     let (final_dfg, remove_cost, removed_edges) = remove_edges_for_redo(start_activities, end_activities, &dfg_with_added, set1, &test_set2);

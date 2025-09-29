@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 pub fn best_parallel_cut_v3(
     dfg: &HashMap<(String, String), usize>,
     all_activities: &HashSet<String>,
-    cost_to_add_edge: &usize
+    cost_to_add_edges: &HashMap<(String, String), f64>
 ) -> (usize, usize, Vec<(String, String, usize)>, HashSet<String>, HashSet<String>, HashMap<(String, String), usize>) {
     let mut min_cost = usize::MAX;
     let mut best_no_of_added_edges = 0;
@@ -13,7 +13,7 @@ pub fn best_parallel_cut_v3(
     let mut best_new_dfg: HashMap<(String, String), usize> = HashMap::new();
     
     // Create missing_dfg - undirected graph with costs for missing edges
-    let (missing_dfg, edge_to_missing_map) = create_missing_dfg(dfg, all_activities, cost_to_add_edge);
+    let (missing_dfg, edge_to_missing_map) = create_missing_dfg(dfg, all_activities, cost_to_add_edges);
 
     // Try each activity as a potential source for min-cut
     let activities: Vec<String> = all_activities.iter().cloned().collect();
@@ -25,7 +25,7 @@ pub fn best_parallel_cut_v3(
             
             // Run max flow / min cut algorithm: uses Ford-Fulkerson with BFS (Edmonds-Karp) to find the minimum cut
             let (max_flow_value, cut_set1, cut_set2, added_edges) = 
-                max_flow_min_cut(&missing_dfg, &edge_to_missing_map, all_activities, source, sink, cost_to_add_edge);
+                max_flow_min_cut(&missing_dfg, &edge_to_missing_map, all_activities, source, sink, cost_to_add_edges);
             
             let cost = max_flow_value;
             let no_of_added_edges = added_edges.len();
@@ -55,7 +55,7 @@ pub fn best_parallel_cut_v3(
 fn create_missing_dfg(
     dfg: &HashMap<(String, String), usize>,
     all_activities: &HashSet<String>,
-    cost_to_add_edge: &usize
+    cost_to_add_edges: &HashMap<(String, String), f64>
 ) -> (HashMap<(String, String), usize>, HashMap<(String, String), Vec<(String, String)>>) {
     let mut missing_dfg = HashMap::new();
     let mut edge_to_missing_map = HashMap::new(); // Maps undirected edge to missing directed edges
@@ -72,17 +72,22 @@ fn create_missing_dfg(
                 let cost = match (edge_ab, edge_ba) {
                     (true, true) => 0,  // Both edges exist
                     (true, false) => {
+                        let edge_ba_cost = cost_to_add_edges.get(&(b.clone(), a.clone())).copied().unwrap_or(-1.0);
                         missing_edges.push((b.clone(), a.clone()));
-                        *cost_to_add_edge
+                        edge_ba_cost as usize
                     },  // (b,a) is missing
                     (false, true) => {
+                        let edge_ab_cost = cost_to_add_edges.get(&(a.clone(), b.clone())).copied().unwrap_or(-1.0);
                         missing_edges.push((a.clone(), b.clone()));
-                        *cost_to_add_edge
+                        edge_ab_cost as usize
                     },  // (a,b) is missing
                     (false, false) => {
                         missing_edges.push((a.clone(), b.clone()));
                         missing_edges.push((b.clone(), a.clone()));
-                        2 * cost_to_add_edge
+                        let edge_ba_cost = cost_to_add_edges.get(&(b.clone(), a.clone())).copied().unwrap_or(-1.0);
+                        let edge_ab_cost = cost_to_add_edges.get(&(a.clone(), b.clone())).copied().unwrap_or(-1.0);
+                        let sum_ab_ba = edge_ab_cost + edge_ba_cost;
+                        sum_ab_ba as usize
                     },  // Both edges missing
                 };
                 
@@ -94,7 +99,7 @@ fn create_missing_dfg(
             }
         }
     }
-    
+
     (missing_dfg, edge_to_missing_map)
 }
 
@@ -104,7 +109,7 @@ fn max_flow_min_cut(
     all_activities: &HashSet<String>,
     source: &String,
     sink: &String,
-    cost_to_add_edge: &usize
+    cost_to_add_edges: &HashMap<(String, String), f64>
 ) -> (usize, HashSet<String>, HashSet<String>, Vec<(String, String, usize)>) {
     
     // Create adjacency list representation
@@ -198,7 +203,8 @@ fn max_flow_min_cut(
                     // Check if this edge crosses the cut
                     if (set1.contains(from) && set2.contains(to)) || 
                        (set2.contains(from) && set1.contains(to)) {
-                        added_edges.push((from.clone(), to.clone(), *cost_to_add_edge));
+                        let cost_to_add_edge = cost_to_add_edges.get(&(from.clone(), to.clone())).copied().unwrap_or(999999.0);
+                        added_edges.push((from.clone(), to.clone(), cost_to_add_edge as usize));
                     }
                 }
             }

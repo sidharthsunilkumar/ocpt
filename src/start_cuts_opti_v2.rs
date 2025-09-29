@@ -6,7 +6,6 @@ use crate::best_parallel_cut_v3::best_parallel_cut_v3;
 use crate::best_redo_cuts::best_redo_cut;
 use crate::best_sequence_cut::best_sequence_cut;
 use crate::best_sequence_cut_v2;
-use crate::cost_to_add::compute_missing_edge_costs;
 use crate::cost_to_add::cost_of_adding_edge;
 use crate::cost_to_cut::is_reachable;
 use crate::cost_to_cut::to_be_non_reachable;
@@ -198,6 +197,7 @@ pub fn find_best_possible_cuts(
     all_activities: &HashSet<String>,
     start_activities: &HashSet<String>,
     end_activities: &HashSet<String>,
+    cost_to_add_edges: &HashMap<(String, String), f64>,
 ) -> CutSuggestionsList{
 
     println!("Finding best possible cuts for all activities: {:?}", all_activities);
@@ -216,13 +216,6 @@ pub fn find_best_possible_cuts(
 
     let mut cuts: Vec<CutSuggestion> = Vec::new();
 
-    let mut cost_to_add_edge: usize = cost_of_adding_edge(&filtered_dfg);
-
-    let test_added_edges = compute_missing_edge_costs(&filtered_dfg);
-    // print the test added edges line by line
-    for ((from, to), cost) in &test_added_edges {
-        println!("Edge to be added: {} -> {} with cost {}", from, to, cost);
-    }
 
     println!("Checking for best possible exclusive cut...");
     let (be_min_cost, be_cut_edges, be_set1, be_set2, be_new_dfg) = best_exclusive_cut(&filtered_dfg, &all_activities);
@@ -249,7 +242,6 @@ pub fn find_best_possible_cuts(
                 set2: be_set2,
                 edges_to_be_added: Vec::new(),
                 edges_to_be_removed: be_cut_edges,
-                cost_to_add_edge: cost_to_add_edge,
                 total_cost: be_min_cost,
             });
         }
@@ -266,7 +258,7 @@ pub fn find_best_possible_cuts(
         bs_set1,
         bs_set2,
         bs_new_dfg,
-    ) = best_sequence_cut(&filtered_dfg, &all_activities, &cost_to_add_edge);
+    ) = best_sequence_cut(&filtered_dfg, &all_activities, &cost_to_add_edges);
     if bs_set1.is_empty() || bs_set2.is_empty() {
         info!("Best sequence cut possible condition failed: one of the sets is empty");
     } else {
@@ -299,7 +291,6 @@ pub fn find_best_possible_cuts(
                 set2: bs_set2,
                 edges_to_be_added: bs_added_edges,
                 edges_to_be_removed: bs_cut_edges,
-                cost_to_add_edge: cost_to_add_edge,
                 total_cost: bs_min_cost,
             });
         }
@@ -314,7 +305,7 @@ pub fn find_best_possible_cuts(
         bp_set1,
         bp_set2,
         bp_new_dfg,
-    ) = best_parallel_cut_v3(&filtered_dfg, &all_activities, &cost_to_add_edge);
+    ) = best_parallel_cut_v3(&filtered_dfg, &all_activities, &cost_to_add_edges);
     if bp_set1.is_empty() || bp_set2.is_empty() {
         println!("Best parallel cut possible condition failed: one of the sets is empty");
     } else {
@@ -336,7 +327,6 @@ pub fn find_best_possible_cuts(
                 set2: bp_set2,
                 edges_to_be_added: bp_added_edges,
                 edges_to_be_removed: Vec::new(),
-                cost_to_add_edge: cost_to_add_edge,
                 total_cost: bp_min_cost,
             });
         }
@@ -344,7 +334,7 @@ pub fn find_best_possible_cuts(
 
     println!("Checking for best redo cut...");
     let (br_is_redo, br_min_cost, br_edges_removed, br_edges_added, br_cost_of_added_edges, br_cost_of_removed_edges, br_set1, br_set2, br_new_dfg) =
-        best_redo_cut(&filtered_dfg, &all_activities, &start_activities, &end_activities, &cost_to_add_edge);
+        best_redo_cut(&filtered_dfg, &all_activities, &start_activities, &end_activities, &cost_to_add_edges);
     if br_is_redo {
         if br_set1.is_empty() || br_set2.is_empty() {
             info!("Best redo cut possible condition failed: one of the sets is empty");
@@ -377,7 +367,6 @@ pub fn find_best_possible_cuts(
                     set2: br_set2,
                     edges_to_be_added: br_edges_added,
                     edges_to_be_removed: br_edges_removed,
-                    cost_to_add_edge: cost_to_add_edge,
                     total_cost: br_min_cost,
                 });
             }

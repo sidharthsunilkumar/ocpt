@@ -36,6 +36,17 @@ pub fn dfg_to_json(dfg: &HashMap<(String, String), usize>) -> serde_json::Value 
     serde_json::to_value(graph).unwrap()
 }
 
+pub fn cost_to_add_edges_to_json(dfg: &HashMap<(String, String), f64>) -> serde_json::Value {
+    let mut json_map = serde_json::Map::new();
+    
+    for ((source, target), cost) in dfg.iter() {
+        let key = format!("{}:{}", source, target);
+        json_map.insert(key, serde_json::Value::Number(serde_json::Number::from_f64(*cost).unwrap()));
+    }
+    
+    serde_json::Value::Object(json_map)
+}
+
 // Convert ProcessForest to JSON 
 pub fn process_forest_to_json(forest: &ProcessForest) -> serde_json::Value {
     serde_json::to_value(forest).unwrap()
@@ -53,6 +64,28 @@ pub fn json_to_dfg(json_val: &serde_json::Value) -> HashMap<(String, String), us
         );
     }
 
+    dfg
+}
+
+// Convert JSON to cost_to_add_edges HashMap
+pub fn json_to_cost_to_add_edges(json_val: &serde_json::Value) -> HashMap<(String, String), f64> {
+    let mut dfg = HashMap::new();
+    
+    if let serde_json::Value::Object(map) = json_val {
+        for (key, value) in map.iter() {
+            if let Some(colon_pos) = key.find(':') {
+                let source = key[..colon_pos].to_string();
+                let target = key[colon_pos + 1..].to_string();
+                
+                if let serde_json::Value::Number(num) = value {
+                    if let Some(cost) = num.as_f64() {
+                        dfg.insert((source, target), cost);
+                    }
+                }
+            }
+        }
+    }
+    
     dfg
 }
 

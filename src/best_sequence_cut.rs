@@ -6,7 +6,7 @@ use log::info;
 pub fn best_sequence_cut(
     dfg: &HashMap<(String, String), usize>, 
     all_activities: &HashSet<String>,
-    cost_to_add_edge: &usize
+    cost_to_add_edges: &HashMap<(String, String), f64>
 ) -> (usize, usize, Vec<(String, String, usize)>, usize, Vec<(String, String, usize)>, HashSet<String>, HashSet<String>, HashMap<(String, String), usize>) {
     let mut min_cost = usize::MAX;
     let mut best_no_of_cut_edges = 0;
@@ -87,9 +87,11 @@ pub fn best_sequence_cut(
                         if !is_reachable(&new_dfg, s1, s2) {
                             // Add edge and update cost
                             let edge = (s1.clone(), s2.clone());
-                            new_dfg.insert(edge, cost_to_add_edge.clone());
-                            total_cost += cost_to_add_edge;
-                            added_edges.push((s1.clone(), s2.clone(), *cost_to_add_edge));
+                            let edge_cost = cost_to_add_edges.get(&edge).copied().unwrap_or(999999.0);
+                            let edge_cost_usize = edge_cost as usize;
+                            new_dfg.insert(edge, edge_cost_usize);
+                            total_cost += edge_cost_usize;
+                            added_edges.push((s1.clone(), s2.clone(), edge_cost_usize));
                             no_of_added_edges += 1;
                         }
                     }

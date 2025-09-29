@@ -1,7 +1,7 @@
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
 use chrono::{DateTime, FixedOffset};
+use std::collections::{HashMap, HashSet};
 
 // OCEL 2.0 structures
 
@@ -203,7 +203,6 @@ pub struct CutSuggestion {
     pub set2: HashSet<String>,
     pub edges_to_be_added: Vec<(String, String, usize)>,
     pub edges_to_be_removed: Vec<(String, String, usize)>,
-    pub cost_to_add_edge: usize,
     pub total_cost: usize
 }
 #[derive(Serialize, Deserialize, Debug)]
@@ -221,7 +220,8 @@ pub struct APIResponse {
     pub is_perfectly_cut: bool,
     pub cut_suggestions_list: CutSuggestionsList,
     pub total_edges_removed: Vec<(String, String, usize)>,
-    pub total_edges_added: Vec<(String, String, usize)>
+    pub total_edges_added: Vec<(String, String, usize)>,
+    pub cost_to_add_edges: serde_json::Value
 }
 
 #[derive(serde::Deserialize)]
@@ -234,6 +234,7 @@ pub struct CutSelectedAPIRequest {
     pub cut_suggestions_list: CutSuggestionsList,
     pub cut_selected: CutSuggestion,
     pub total_edges_removed: Vec<(String, String, usize)>,
-    pub total_edges_added: Vec<(String, String, usize)>
+    pub total_edges_added: Vec<(String, String, usize)>,
+    pub cost_to_add_edges: serde_json::Value
 }
 
