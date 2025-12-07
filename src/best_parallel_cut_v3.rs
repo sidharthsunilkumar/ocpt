@@ -72,20 +72,20 @@ fn create_missing_dfg(
                 let cost = match (edge_ab, edge_ba) {
                     (true, true) => 0,  // Both edges exist
                     (true, false) => {
-                        let edge_ba_cost = cost_to_add_edges.get(&(b.clone(), a.clone())).copied().unwrap_or(-1.0);
+                        let edge_ba_cost = cost_to_add_edges.get(&(b.clone(), a.clone())).copied().unwrap_or(1.0);
                         missing_edges.push((b.clone(), a.clone()));
                         edge_ba_cost as usize
                     },  // (b,a) is missing
                     (false, true) => {
-                        let edge_ab_cost = cost_to_add_edges.get(&(a.clone(), b.clone())).copied().unwrap_or(-1.0);
+                        let edge_ab_cost = cost_to_add_edges.get(&(a.clone(), b.clone())).copied().unwrap_or(1.0);
                         missing_edges.push((a.clone(), b.clone()));
                         edge_ab_cost as usize
                     },  // (a,b) is missing
                     (false, false) => {
                         missing_edges.push((a.clone(), b.clone()));
                         missing_edges.push((b.clone(), a.clone()));
-                        let edge_ba_cost = cost_to_add_edges.get(&(b.clone(), a.clone())).copied().unwrap_or(-1.0);
-                        let edge_ab_cost = cost_to_add_edges.get(&(a.clone(), b.clone())).copied().unwrap_or(-1.0);
+                        let edge_ba_cost = cost_to_add_edges.get(&(b.clone(), a.clone())).copied().unwrap_or(1.0);
+                        let edge_ab_cost = cost_to_add_edges.get(&(a.clone(), b.clone())).copied().unwrap_or(1.0);
                         let sum_ab_ba = edge_ab_cost + edge_ba_cost;
                         sum_ab_ba as usize
                     },  // Both edges missing

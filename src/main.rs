@@ -8,6 +8,7 @@ use std::fs as stdfs;
 use std::fs::File;
 use std::io::Write;
 use std::sync::Arc;
+mod add_self_loops;
 mod build_relations_fns;
 mod divergence_free_dfg;
 mod format_conversion;
@@ -18,6 +19,7 @@ mod start_cuts_opti_v1;
 mod start_cuts_opti_v2;
 mod types;
 use log::info;
+use add_self_loops::add_self_loops;
 mod best_exclusive_cut;
 mod best_parallel_cut;
 mod best_parallel_cut_exhaustive;
@@ -33,6 +35,12 @@ use crate::cost_to_add::cost_of_adding_edge;
 use axum::extract::Json as AxumJson;
 use axum::extract::Path;
 use axum::http::StatusCode;
+
+// Include the conformance checking modules
+mod conformance_checking;
+mod conformance_checking_mine;
+use conformance_checking::{calculate_conformance_metrics, ConformanceMetrics};
+use conformance_checking_mine::conformance_checking_mine_fitness;
 
 //For REST API server
 use axum::Json;
@@ -203,6 +211,61 @@ async fn getInitialResponse() -> Json<Value> {
     Json(serde_json::to_value(response).unwrap())
 }
 
+
+fn test_conformance(ocpt_data: serde_json::Value) {
+    // Placeholder for conformance checking test function
+
+     // Read OCEL log
+    let file_name = "order-management";
+    let file_path = "data/order-management.json";
+    
+    println!("Reading OCEL log from: {}", file_path);
+    let file_content = stdfs::read_to_string(&file_path)
+        .expect("Failed to read OCEL file");
+    
+    let ocel: OCEL = serde_json::from_str(&file_content)
+        .expect("Failed to parse OCEL JSON");
+    
+    println!("✓ OCEL log loaded successfully");
+    println!("  - Events: {}", ocel.events.len());
+    println!("  - Objects: {}", ocel.objects.len());
+    println!();
+
+    let process_tree: ProcessForest = serde_json::from_value(ocpt_data)
+        .expect("Failed to parse OCPT JSON");
+    
+    println!("✓ Process tree (OCPT) loaded successfully");
+    println!();
+    
+    // Calculate conformance metrics
+    println!("Calculating conformance metrics...");
+    println!();
+    
+    let metrics = calculate_conformance_metrics(&ocel, &process_tree);
+    
+    // Print results
+    println!("{}", metrics);
+    
+    // Additional detailed output
+    println!();
+    println!("Interpretation:");
+    if metrics.fitness >= 0.9 {
+        println!("✓ High fitness: The log fits the model very well");
+    } else if metrics.fitness >= 0.7 {
+        println!("⚠ Moderate fitness: Some traces deviate from the model");
+    } else {
+        println!("✗ Low fitness: Significant deviations between log and model");
+    }
+    
+    if metrics.precision >= 0.9 {
+        println!("✓ High precision: The model is not overly general");
+    } else if metrics.precision >= 0.7 {
+        println!("⚠ Moderate precision: The model allows some extra behavior");
+    } else {
+        println!("✗ Low precision: The model is too general");
+    }
+}
+
 // async fn testMissingEdgeCost(Path(file_name): Path<String>) -> Json<Value> {
 //     println!("testMissingEdgeCost called with file_name: {}", file_name);
 //     println!("Starting...");
@@ -324,6 +387,176 @@ async fn getInitialResponse() -> Json<Value> {
 //     Json(Value::Object(response_data))
 // }
 
+// New function to generate all possible OCPTs
+async fn all_possible_ocpts() -> Json<Value> {
+    println!("Starting all_possible_ocpts...");
+
+    // Initial setup - same as getInitialResponse
+    let file_name = "order-management";
+    let file_path = "data/order-management.json";
+
+    let file_content = stdfs::read_to_string(&file_path).unwrap();
+    let ocel: OCEL = serde_json::from_str(&file_content).unwrap();
+
+    let relations = build_relations_fns::build_relations(&ocel.events, &ocel.objects);
+    let (div, _con, _rel, _defi, all_activities, _all_object_types) =
+        interaction_patterns::get_interaction_patterns(&relations, &ocel);
+
+    let (dfg, start_acts, end_acts) =
+        divergence_free_dfg::get_divergence_free_graph_v2(&relations, &div);
+
+    let remove_list = vec![];
+    let filtered_dfg = filter_dfg(&dfg, &remove_list);
+    let filtered_activities = filter_activities(&all_activities, &remove_list);
+
+    // Get initial process forest
+    let initial_process_forest = start_cuts_opti_v2::find_cuts_start(
+        &filtered_dfg,
+        &filtered_activities,
+        &start_acts,
+        &end_acts,
+    );
+
+    // Structure to track state for recursion
+    #[derive(Clone)]
+    struct OCPTState {
+        ocpt: ProcessForest,
+        dfg: HashMap<(String, String), usize>,
+        total_edges_added: Vec<(String, String, usize)>,
+        total_edges_removed: Vec<(String, String, usize)>,
+        cost_to_add_edges: HashMap<(String, String), f64>,
+    }
+
+    let initial_cost_to_add_edges = cost_of_adding_edge(&relations, &div, &filtered_dfg);
+    
+    let initial_state = OCPTState {
+        ocpt: initial_process_forest.clone(),
+        dfg: filtered_dfg.clone(),
+        total_edges_added: Vec::new(),
+        total_edges_removed: Vec::new(),
+        cost_to_add_edges: initial_cost_to_add_edges,
+    };
+
+    let mut all_final_ocpts: Vec<ProcessForest> = Vec::new();
+    let mut states_to_process: Vec<OCPTState> = vec![initial_state];
+    let mut ocpt_counter = 1;
+
+    println!("Starting recursive OCPT generation...\n");
+
+    while let Some(current_state) = states_to_process.pop() {
+        println!("=== Processing OCPT #{} ===", ocpt_counter);
+        print_process_forest(&current_state.ocpt);
+
+        let (found_disjoint, disjoint_activities) = collect_disjoint_activities(&current_state.ocpt);
+
+        if found_disjoint {
+            println!("Disjoint activities found: {:?}", disjoint_activities);
+            
+            // Get cut suggestions for this state
+            let cut_suggestions_list = start_cuts_opti_v2::find_best_possible_cuts(
+                &current_state.dfg,
+                &disjoint_activities,
+                &start_acts,
+                &end_acts,
+                &current_state.cost_to_add_edges
+            );
+
+            if cut_suggestions_list.cuts.is_empty() {
+                println!("No cut suggestions available. Adding to final OCPTs.");
+                all_final_ocpts.push(current_state.ocpt);
+            } else {
+                println!("Found {} cut suggestions. Applying each...", cut_suggestions_list.cuts.len());
+                
+                // Apply each cut suggestion and add to queue for further processing
+                for (cut_idx, cut_suggestion) in cut_suggestions_list.cuts.iter().enumerate() {
+                    println!("  Applying cut suggestion {}/{}: {:?}", cut_idx + 1, cut_suggestions_list.cuts.len(), cut_suggestion.cut_type);
+                    
+                    // Clone current state for modification
+                    let mut new_state = current_state.clone();
+
+                    // Apply the cut (modify DFG)
+                    for (from, to, _) in &cut_suggestion.edges_to_be_removed {
+                        new_state.dfg.remove(&(from.clone(), to.clone()));
+                    }
+                    
+                    for (from, to, cost) in &cut_suggestion.edges_to_be_added {
+                        new_state.dfg.insert((from.clone(), to.clone()), cost.clone());
+                    }
+
+                    // Update cost_to_add_edges
+                    for (from, to, _) in &cut_suggestion.edges_to_be_removed {
+                        new_state.cost_to_add_edges.remove(&(from.clone(), to.clone()));
+                    }
+
+                    // Create new tree node based on the cut
+                    let new_tree_node = create_new_tree_node_by_cut_selection(
+                        &new_state.dfg,
+                        cut_suggestion,
+                        &start_acts,
+                        &end_acts,
+                    );
+
+                    // Modify the process forest
+                    new_state.ocpt = modify_process_forest(
+                        new_state.ocpt,
+                        &cut_suggestions_list.all_activities,
+                        cut_suggestion,
+                        &new_tree_node
+                    );
+
+                    // Update tracking info
+                    new_state.total_edges_removed.extend(cut_suggestion.edges_to_be_removed.clone());
+                    new_state.total_edges_added.extend(cut_suggestion.edges_to_be_added.clone());
+
+                    // Add to queue for further processing
+                    states_to_process.push(new_state);
+                }
+            }
+        } else {
+            println!("No disjoint activities found. Adding to final OCPTs.");
+            
+            // Apply self-loops for complete process forest
+            let final_ocpt = add_self_loops(&current_state.dfg, &current_state.ocpt);
+            all_final_ocpts.push(final_ocpt);
+        }
+
+        ocpt_counter += 1;
+        println!();
+    }
+
+    // Print all final OCPTs
+    println!("\n{}", "=".repeat(60));
+    println!("FINAL RESULTS: Found {} distinct process forests", all_final_ocpts.len());
+    println!("{}", "=".repeat(60));
+
+    for (i, final_ocpt) in all_final_ocpts.iter().enumerate() {
+        println!("\n>>> FINAL OCPT #{} <<<", i + 1);
+        print_process_forest(final_ocpt);
+        println!("JSON representation:");
+        let json_string = process_forest_to_json(final_ocpt);
+        println!("{}", json_string);
+        
+        // Perform conformance checking for this OCPT
+        println!("\n--- Conformance Analysis for OCPT #{} ---", i + 1);
+        test_conformance(json_string.clone());
+        
+        // Perform custom conformance checking
+        println!("\n--- Custom Conformance Analysis for OCPT #{} ---", i + 1);
+        conformance_checking_mine_fitness(final_ocpt);
+        
+        println!("{}", "-".repeat(40));
+    }
+
+    // Return summary response
+    let response = serde_json::json!({
+        "total_ocpts": all_final_ocpts.len(),
+        "ocpts": all_final_ocpts.iter().map(|ocpt| process_forest_to_json(ocpt)).collect::<Vec<_>>(),
+        "message": format!("Generated {} distinct process forests", all_final_ocpts.len())
+    });
+
+    Json(response)
+}
+
 // Handler for POST /cut-selected
 async fn cut_selected_handler(
     AxumJson(payload): AxumJson<CutSelectedAPIRequest>,
@@ -430,6 +663,18 @@ async fn cut_selected_handler(
         response.cut_suggestions_list = cut_suggestions_list;
     } else {
         println!("No disjoint activities found in the OCPT");
+
+        // Get the modified OCPT with self-loops added
+        let modified_ocpt = add_self_loops(&dfg.clone(), &ocpt);
+        
+        // Update the response with the modified OCPT
+        let modified_ocpt_json_string = process_forest_to_json(&modified_ocpt);
+        response.OCPT = modified_ocpt_json_string;
+
+        // add code to find precision
+
+        test_conformance(response.OCPT.clone());
+
     }
 
 
@@ -527,6 +772,7 @@ async fn main() {
     let app = Router::new()
         .route("/", get(getInitialResponse))
         .route("/dfg", get(hello))
+        .route("/all-possible-ocpts", get(all_possible_ocpts))
         // .route("/test-cost-to-add-edge/:file_name", get(testCostToAddEdge))
         // .route("/missing-edge-cost/:file_name", get(testMissingEdgeCost))
         .route("/cut-selected", axum::routing::post(cut_selected_handler))
@@ -535,6 +781,7 @@ async fn main() {
     println!("Routes configured:");
     println!("  GET /");
     println!("  GET /dfg");
+    println!("  GET /all-possible-ocpts");
     println!("  GET /test-cost-to-add-edge/:file_name");
     println!("  GET /missing-edge-cost/:file_name");
     println!("  POST /cut-selected");
