@@ -1,5 +1,5 @@
 use crate::format_conversion::{from_json_value, json_to_dfg, json_to_process_forest, process_forest_to_json, json_to_cost_to_add_edges};
-use crate::types::{APIResponse, CutSelectedAPIRequest, CutSuggestion, CutSuggestionsList, OCEL, ProcessForest, TreeNode};
+use crate::types::{APIResponse, CutSelectedAPIRequest, CutSuggestion, CutSuggestionsList, OCEL, ProcessForest, TreeNode, OCPTWithMetrics};
 use serde::Deserialize;
 use simplelog::*;
 use std::collections::{HashMap, HashSet};
@@ -40,7 +40,7 @@ use axum::http::StatusCode;
 mod conformance_checking;
 mod conformance_checking_mine;
 use conformance_checking::{calculate_conformance_metrics, ConformanceMetrics};
-use conformance_checking_mine::conformance_checking_mine_fitness;
+use conformance_checking_mine::{conformance_checking_mine_fitness, conformance_checking_mine_precision};
 
 //For REST API server
 use axum::Json;
@@ -74,13 +74,11 @@ async fn getInitialResponse() -> Json<Value> {
 
     // Changed to use OCEL 2.0 format
     let file_name ="order-management";
-    let file_path = "data/order-management.json";
     // let file_name ="ContainerLogistics";
-    // let file_path = "data/ContainerLogistics.json";
     // let file_name ="ocel2-p2p";
-    // let file_path = "data/ocel2-p2p.json";
     // let file_name ="age_of_empires_ocel2";
-    // let file_path = "data/age_of_empires_ocel2.json";
+    
+    let file_path = format!("data/{}.json", file_name);
 
     let file_content = stdfs::read_to_string(&file_path).unwrap();
     let ocel: OCEL = serde_json::from_str(&file_content).unwrap();
@@ -217,7 +215,7 @@ fn test_conformance(ocpt_data: serde_json::Value) {
 
      // Read OCEL log
     let file_name = "order-management";
-    let file_path = "data/order-management.json";
+    let file_path = format!("data/{}.json", file_name);
     
     println!("Reading OCEL log from: {}", file_path);
     let file_content = stdfs::read_to_string(&file_path)
@@ -266,134 +264,16 @@ fn test_conformance(ocpt_data: serde_json::Value) {
     }
 }
 
-// async fn testMissingEdgeCost(Path(file_name): Path<String>) -> Json<Value> {
-//     println!("testMissingEdgeCost called with file_name: {}", file_name);
-//     println!("Starting...");
-
-//     // Changed to use OCEL 2.0 format - now using the file_name parameter
-//     let file_path = format!("data/{}.json", file_name);
-//     println!("Constructed file_path: {}", file_path);
-
-//     let file_content = stdfs::read_to_string(&file_path).unwrap();
-//     let ocel: OCEL = serde_json::from_str(&file_content).unwrap();
-
-//     let relations = build_relations_fns::build_relations(&ocel.events, &ocel.objects);
-
-//     let (div, _con, _rel, _defi, _all_activities, _all_object_types) =
-//         interaction_patterns::get_interaction_patterns(&relations, &ocel);
-
-//     let (dfg, _start_acts, _end_acts) =
-//         divergence_free_dfg::get_divergence_free_graph_v2(&relations, &div);
-
-//     // Call the cost_of_adding_edge_new function and capture the return value
-//     let missing_edge_costs = cost_of_adding_edge_new(&relations, &div, &dfg);
-
-//     // Convert missing_edge_costs to JSON format
-//     let mut missing_edge_costs_json = serde_json::Map::new();
-    
-//     for ((source_activity, target_activity), cost) in missing_edge_costs {
-//         let edge_key = format!("{}→{}", source_activity, target_activity);
-        
-//         // Convert cost to JSON value
-//         let cost_value = serde_json::Number::from_f64(cost).unwrap_or(serde_json::Number::from(0));
-//         missing_edge_costs_json.insert(edge_key, serde_json::Value::Number(cost_value));
-//     }
-
-//     // Return the missing edge costs as JSON
-//     let response = serde_json::json!({
-//         "missing_edge_costs": missing_edge_costs_json
-//     });
-
-//     Json(response)
-// }
-
-// async fn testCostToAddEdge(Path(file_name): Path<String>) -> Json<Value> {
-//     println!("testCostToAddEdge called with file_name: {}", file_name);
-//     println!("Starting...");
-
-//     // Changed to use OCEL 2.0 format - now using the file_name parameter
-//     let file_path = format!("data/{}.json", file_name);
-//     println!("Constructed file_path: {}", file_path);
-
-//     let file_content = stdfs::read_to_string(&file_path).unwrap();
-//     let ocel: OCEL = serde_json::from_str(&file_content).unwrap();
-
-//     let relations = build_relations_fns::build_relations(&ocel.events, &ocel.objects);
-
-//     let (div, _con, _rel, _defi, _all_activities, _all_object_types) =
-//         interaction_patterns::get_interaction_patterns(&relations, &ocel);
-
-//     // Get DFGs by object type
-//     let dfg_sets = get_dfg_by_object_type::get_dfg_by_object_type(&relations, &div);
-
-//     let (dfg, _start_acts, _end_acts) =
-//         divergence_free_dfg::get_divergence_free_graph_v2(&relations, &div);
-
-//     println!("created DFG!");
-
-//     // Call cost_of_adding_edge_by_object_type function
-//     let (missing_edge_dfg, probability_of_missing_edge, rarity_score, normalised_rarity_score) = cost_of_adding_edge_by_object_type(&dfg, &dfg_sets);
-
-//     // Create response with dfg, dfg_sets, and missing_edge_dfg
-//     let mut response_data = serde_json::Map::new();
-    
-//     // Convert dfg to JSON format
-//     let dfg_json: Value = format_conversion::dfg_to_json(&dfg);
-//     response_data.insert("dfg".to_string(), dfg_json);
-    
-//     // Convert dfg_sets to JSON format with custom serialization
-//     let mut dfg_sets_json = serde_json::Map::new();
-//     for (object_type, (dfg_otype, start_acts, end_acts)) in &dfg_sets {
-//         let mut object_data = serde_json::Map::new();
-        
-//         // Convert the DFG to JSON format
-//         let dfg_otype_json: Value = format_conversion::dfg_to_json(dfg_otype);
-//         object_data.insert("dfg".to_string(), dfg_otype_json);
-        
-//         // Convert HashSets to Vec for JSON serialization
-//         let start_acts_vec: Vec<String> = start_acts.iter().cloned().collect();
-//         let end_acts_vec: Vec<String> = end_acts.iter().cloned().collect();
-        
-//         object_data.insert("start_activities".to_string(), serde_json::to_value(start_acts_vec).unwrap());
-//         object_data.insert("end_activities".to_string(), serde_json::to_value(end_acts_vec).unwrap());
-        
-//         dfg_sets_json.insert(object_type.clone(), Value::Object(object_data));
-//     }
-//     response_data.insert("dfg_sets".to_string(), Value::Object(dfg_sets_json));
-    
-//     // Convert missing_edge_dfg to JSON format
-//     let missing_edge_dfg_json: Value = format_conversion::dfg_to_json(&missing_edge_dfg);
-//     response_data.insert("missing_edge_dfg".to_string(), missing_edge_dfg_json);
-
-//     // Add the additional data structures
-//     response_data.insert("probability_of_missing_edge".to_string(), Value::Number(serde_json::Number::from_f64(probability_of_missing_edge).unwrap_or(serde_json::Number::from(0))));
-    
-//     // Convert rarity_score to JSON format with string keys
-//     let mut rarity_score_json = serde_json::Map::new();
-//     for ((a, b), score) in &rarity_score {
-//         let key = format!("{}→{}", a, b);
-//         rarity_score_json.insert(key, Value::Number(serde_json::Number::from_f64(*score).unwrap_or(serde_json::Number::from(0))));
-//     }
-//     response_data.insert("rarity_score".to_string(), Value::Object(rarity_score_json));
-    
-//     // Convert normalised_rarity_score to JSON format with string keys
-//     let mut normalised_rarity_score_json = serde_json::Map::new();
-//     for ((a, b), score) in &normalised_rarity_score {
-//         let key = format!("{}→{}", a, b);
-//         normalised_rarity_score_json.insert(key, Value::Number(serde_json::Number::from_f64(*score).unwrap_or(serde_json::Number::from(0))));
-//     }
-//     response_data.insert("normalised_rarity_score".to_string(), Value::Object(normalised_rarity_score_json));
-
-//     Json(Value::Object(response_data))
-// }
-
 // New function to generate all possible OCPTs
 async fn all_possible_ocpts() -> Json<Value> {
     println!("Starting all_possible_ocpts...");
 
     // Initial setup - same as getInitialResponse
-    let file_name = "order-management";
-    let file_path = "data/order-management.json";
+    // let file_name = "order-management";
+    let file_name = "ocel2-p2p";
+    // let file_name = "ContainerLogistics";
+    // let file_name = "age_of_empires_ocel2";
+    let file_path = format!("data/{}.json", file_name);
 
     let file_content = stdfs::read_to_string(&file_path).unwrap();
     let ocel: OCEL = serde_json::from_str(&file_content).unwrap();
@@ -425,6 +305,7 @@ async fn all_possible_ocpts() -> Json<Value> {
         total_edges_added: Vec<(String, String, usize)>,
         total_edges_removed: Vec<(String, String, usize)>,
         cost_to_add_edges: HashMap<(String, String), f64>,
+        sequence_of_choices: Vec<String>,
     }
 
     let initial_cost_to_add_edges = cost_of_adding_edge(&relations, &div, &filtered_dfg);
@@ -435,9 +316,14 @@ async fn all_possible_ocpts() -> Json<Value> {
         total_edges_added: Vec::new(),
         total_edges_removed: Vec::new(),
         cost_to_add_edges: initial_cost_to_add_edges,
+        sequence_of_choices: Vec::new(),
     };
 
+    let mut self_loop_activities_list: Vec<String> = Vec::new();
+
     let mut all_final_ocpts: Vec<ProcessForest> = Vec::new();
+    let mut all_final_sequences: Vec<Vec<String>> = Vec::new();
+    let mut ocpts_with_metrics: Vec<OCPTWithMetrics> = Vec::new();
     let mut states_to_process: Vec<OCPTState> = vec![initial_state];
     let mut ocpt_counter = 1;
 
@@ -463,7 +349,8 @@ async fn all_possible_ocpts() -> Json<Value> {
 
             if cut_suggestions_list.cuts.is_empty() {
                 println!("No cut suggestions available. Adding to final OCPTs.");
-                all_final_ocpts.push(current_state.ocpt);
+                all_final_ocpts.push(current_state.ocpt.clone());
+                all_final_sequences.push(current_state.sequence_of_choices.clone());
             } else {
                 println!("Found {} cut suggestions. Applying each...", cut_suggestions_list.cuts.len());
                 
@@ -507,6 +394,9 @@ async fn all_possible_ocpts() -> Json<Value> {
                     // Update tracking info
                     new_state.total_edges_removed.extend(cut_suggestion.edges_to_be_removed.clone());
                     new_state.total_edges_added.extend(cut_suggestion.edges_to_be_added.clone());
+                    
+                    // Add the choice to the sequence of choices
+                    new_state.sequence_of_choices.push(cut_suggestion.cut_type.clone());
 
                     // Add to queue for further processing
                     states_to_process.push(new_state);
@@ -516,8 +406,11 @@ async fn all_possible_ocpts() -> Json<Value> {
             println!("No disjoint activities found. Adding to final OCPTs.");
             
             // Apply self-loops for complete process forest
-            let final_ocpt = add_self_loops(&current_state.dfg, &current_state.ocpt);
+            let (final_ocpt, self_loop_activities) = add_self_loops(&current_state.dfg, &current_state.ocpt, file_name);
+            self_loop_activities_list = self_loop_activities.clone();
+            // println!("Self-loop activities processed: {:?}", self_loop_activities);
             all_final_ocpts.push(final_ocpt);
+            all_final_sequences.push(current_state.sequence_of_choices.clone());
         }
 
         ocpt_counter += 1;
@@ -529,29 +422,113 @@ async fn all_possible_ocpts() -> Json<Value> {
     println!("FINAL RESULTS: Found {} distinct process forests", all_final_ocpts.len());
     println!("{}", "=".repeat(60));
 
-    for (i, final_ocpt) in all_final_ocpts.iter().enumerate() {
+    for (i, (final_ocpt, sequence_of_choices)) in all_final_ocpts.iter().zip(all_final_sequences.iter()).enumerate() {
         println!("\n>>> FINAL OCPT #{} <<<", i + 1);
+        println!("Sequence of choices: {:?}", sequence_of_choices);
         print_process_forest(final_ocpt);
         println!("JSON representation:");
         let json_string = process_forest_to_json(final_ocpt);
         println!("{}", json_string);
         
-        // Perform conformance checking for this OCPT
-        println!("\n--- Conformance Analysis for OCPT #{} ---", i + 1);
-        test_conformance(json_string.clone());
+        // // Perform conformance checking for this OCPT
+        // println!("\n--- Conformance Analysis for OCPT #{} ---", i + 1);
+        // test_conformance(json_string.clone());
         
         // Perform custom conformance checking
         println!("\n--- Custom Conformance Analysis for OCPT #{} ---", i + 1);
-        conformance_checking_mine_fitness(final_ocpt);
+        let fitness_percentage = conformance_checking_mine_fitness(final_ocpt, file_name);
+        
+        // Calculate precision (all possible executions)
+        println!("\n--- Precision Analysis for OCPT #{} ---", i + 1);
+        let precision_percentage = conformance_checking_mine_precision(final_ocpt, &self_loop_activities_list, file_name);
+        
+        // Calculate F1 Score = 2 * (Precision * Fitness) / (Precision + Fitness)
+        let f_score = if (precision_percentage + fitness_percentage) > 0.0 {
+            2.0 * (precision_percentage * fitness_percentage) / (precision_percentage + fitness_percentage)
+        } else {
+            0.0
+        };
+
+        println!("Summary for OCPT #{}: Fitness = {:.2}%, Precision = {:.2}%, F1-Score = {:.2}%", 
+                 i + 1, fitness_percentage, precision_percentage, f_score);
+
+        // Create OCPTWithMetrics object and add to list
+        let ocpt_with_metrics = OCPTWithMetrics {
+            ocpt: final_ocpt.clone(),
+            fitness_percentage,
+            precision_percentage,
+            f_score,
+            sequence_of_choices: sequence_of_choices.clone(),
+        };
+        ocpts_with_metrics.push(ocpt_with_metrics);
         
         println!("{}", "-".repeat(40));
+    }
+
+    // Find and print best OCPTs by specific metrics
+    if !ocpts_with_metrics.is_empty() {
+        println!("\n{}", "=".repeat(60));
+        println!("BEST PERFORMING OCPTs");
+        println!("{}", "=".repeat(60));
+        
+        // Find OCPT with best fitness
+        let best_fitness_ocpt = ocpts_with_metrics.iter()
+            .enumerate()
+            .max_by(|(_, a), (_, b)| a.fitness_percentage.partial_cmp(&b.fitness_percentage).unwrap());
+        
+        if let Some((best_fitness_idx, best_fitness_metrics)) = best_fitness_ocpt {
+            println!("🏆 BEST FITNESS: OCPT #{} - Fitness = {:.2}%, Precision = {:.2}%, F1-Score = {:.2}%", 
+                     best_fitness_idx + 1, 
+                     best_fitness_metrics.fitness_percentage, 
+                     best_fitness_metrics.precision_percentage,
+                     best_fitness_metrics.f_score);
+            println!("   Sequence of choices: {:?}", best_fitness_metrics.sequence_of_choices);
+        }
+        
+        // Find OCPT with best precision
+        let best_precision_ocpt = ocpts_with_metrics.iter()
+            .enumerate()
+            .max_by(|(_, a), (_, b)| a.precision_percentage.partial_cmp(&b.precision_percentage).unwrap());
+        
+        if let Some((best_precision_idx, best_precision_metrics)) = best_precision_ocpt {
+            println!("� BEST PRECISION: OCPT #{} - Fitness = {:.2}%, Precision = {:.2}%, F1-Score = {:.2}%", 
+                     best_precision_idx + 1, 
+                     best_precision_metrics.fitness_percentage, 
+                     best_precision_metrics.precision_percentage,
+                     best_precision_metrics.f_score);
+            println!("   Sequence of choices: {:?}", best_precision_metrics.sequence_of_choices);
+        }
+
+        // Find OCPT with best F1 score
+        let best_f_score_ocpt = ocpts_with_metrics.iter()
+            .enumerate()
+            .max_by(|(_, a), (_, b)| a.f_score.partial_cmp(&b.f_score).unwrap());
+        
+        if let Some((best_f_score_idx, best_f_score_metrics)) = best_f_score_ocpt {
+            println!("⚖️ BEST F1-SCORE: OCPT #{} - Fitness = {:.2}%, Precision = {:.2}%, F1-Score = {:.2}%", 
+                     best_f_score_idx + 1, 
+                     best_f_score_metrics.fitness_percentage, 
+                     best_f_score_metrics.precision_percentage,
+                     best_f_score_metrics.f_score);
+            println!("   Sequence of choices: {:?}", best_f_score_metrics.sequence_of_choices);
+        }
     }
 
     // Return summary response
     let response = serde_json::json!({
         "total_ocpts": all_final_ocpts.len(),
         "ocpts": all_final_ocpts.iter().map(|ocpt| process_forest_to_json(ocpt)).collect::<Vec<_>>(),
-        "message": format!("Generated {} distinct process forests", all_final_ocpts.len())
+        "ocpts_with_metrics": ocpts_with_metrics.iter().map(|ocpt_metrics| {
+            serde_json::json!({
+                "ocpt": process_forest_to_json(&ocpt_metrics.ocpt),
+                "fitness_percentage": ocpt_metrics.fitness_percentage,
+                "precision_percentage": ocpt_metrics.precision_percentage,
+                "f_score": ocpt_metrics.f_score,
+                "sequence_of_choices": ocpt_metrics.sequence_of_choices,
+                "average_score": (ocpt_metrics.fitness_percentage + ocpt_metrics.precision_percentage) / 2.0
+            })
+        }).collect::<Vec<_>>(),
+        "message": format!("Generated {} distinct process forests with conformance metrics", all_final_ocpts.len())
     });
 
     Json(response)
@@ -563,6 +540,7 @@ async fn cut_selected_handler(
 ) -> Json<Value> {
     println!("Received cut-selected request: {:?}", payload.cut_selected);
 
+    let file_name = "order-management";
     let mut ocpt: ProcessForest = from_json_value(&payload.ocpt);
     let mut dfg: HashMap<(String, String), usize> = json_to_dfg(&payload.dfg);
     let global_start_activities: HashSet<String> = payload.start_activities;
@@ -665,19 +643,24 @@ async fn cut_selected_handler(
         println!("No disjoint activities found in the OCPT");
 
         // Get the modified OCPT with self-loops added
-        let modified_ocpt = add_self_loops(&dfg.clone(), &ocpt);
+        let (modified_ocpt, self_loop_activities) = add_self_loops(&dfg.clone(), &ocpt, file_name);
+        println!("Self-loop activities processed: {:?}", self_loop_activities);
         
         // Update the response with the modified OCPT
         let modified_ocpt_json_string = process_forest_to_json(&modified_ocpt);
         response.OCPT = modified_ocpt_json_string;
 
         // add code to find precision
+        println!("\n--- Precision Analysis ---");
+        let precision_percentage = conformance_checking_mine_precision(&modified_ocpt, &self_loop_activities, file_name);
+        
+        println!("Final OCPT Precision: {:.2}%", precision_percentage);
 
         test_conformance(response.OCPT.clone());
 
+        
+
     }
-
-
     Json(serde_json::to_value(response).unwrap())
 }
 
@@ -773,8 +756,6 @@ async fn main() {
         .route("/", get(getInitialResponse))
         .route("/dfg", get(hello))
         .route("/all-possible-ocpts", get(all_possible_ocpts))
-        // .route("/test-cost-to-add-edge/:file_name", get(testCostToAddEdge))
-        // .route("/missing-edge-cost/:file_name", get(testMissingEdgeCost))
         .route("/cut-selected", axum::routing::post(cut_selected_handler))
         .layer(cors);
     
@@ -782,8 +763,6 @@ async fn main() {
     println!("  GET /");
     println!("  GET /dfg");
     println!("  GET /all-possible-ocpts");
-    println!("  GET /test-cost-to-add-edge/:file_name");
-    println!("  GET /missing-edge-cost/:file_name");
     println!("  POST /cut-selected");
     println!("Server running on http://localhost:1080");
 

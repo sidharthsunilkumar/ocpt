@@ -6,9 +6,9 @@ use crate::interaction_patterns;
 
 /// Adds self-loops to a DFG and prints it
 /// 
-/// This function takes a DFG (Directly-Follows Graph) and OCPT (Process Forest) and prints their structure,
-/// including all nodes and edges. Returns the modified OCPT with self-loops added.
-pub fn add_self_loops(dfg: &HashMap<(String, String), usize>, ocpt: &ProcessForest) -> ProcessForest {
+/// This function takes a DFG (Directly-Follows Graph), OCPT (Process Forest), and file name and prints their structure,
+/// including all nodes and edges. Returns the modified OCPT with self-loops added and the list of self-loop activities.
+pub fn add_self_loops(dfg: &HashMap<(String, String), usize>, ocpt: &ProcessForest, file_name: &str) -> (ProcessForest, Vec<String>) {
     println!("Checking for self-loops in DFG...");
     
     // Extract unique activities (nodes) from the DFG
@@ -33,13 +33,13 @@ pub fn add_self_loops(dfg: &HashMap<(String, String), usize>, ocpt: &ProcessFore
     // Adding self loop algorithm
     if self_loop_activities.is_empty() {
         println!("No self-loops found. Returning original OCPT.");
-        return ocpt.clone();
+        return (ocpt.clone(), self_loop_activities);
     }
     
     println!("Processing {} self-loop(s) and modifying OCPT...", self_loop_activities.len());
     
     // Get traces once outside the loop to avoid multiple calls
-    let all_traces = get_traces();
+    let all_traces = get_traces(file_name);
     
     // Start with the original OCPT and progressively modify it
     let mut current_ocpt = ocpt.clone();
@@ -151,20 +151,12 @@ pub fn add_self_loops(dfg: &HashMap<(String, String), usize>, ocpt: &ProcessFore
         }
     }
     
-    // Return the final modified OCPT
+    // Return the final modified OCPT and the self-loop activities
     println!("Successfully processed and added {} self-loop(s) to OCPT.", processed_count);
-    current_ocpt
+    (current_ocpt, self_loop_activities)
 }
-pub fn get_traces() -> Vec<Vec<(String, String, String, String, String)>> {
-
-    let file_name ="order-management";
-    let file_path = "data/order-management.json";
-    // let file_name ="ContainerLogistics";
-    // let file_path = "data/ContainerLogistics.json";
-    // let file_name ="ocel2-p2p";
-    // let file_path = "data/ocel2-p2p.json";
-    // let file_name ="age_of_empires_ocel2";
-    // let file_path = "data/age_of_empires_ocel2.json";
+pub fn get_traces(file_name: &str) -> Vec<Vec<(String, String, String, String, String)>> {
+    let file_path = format!("data/{}.json", file_name);
 
     let file_content = stdfs::read_to_string(&file_path).unwrap();
     let ocel: OCEL = serde_json::from_str(&file_content).unwrap();

@@ -238,3 +238,12 @@ pub struct CutSelectedAPIRequest {
     pub cost_to_add_edges: serde_json::Value
 }
 
+#[derive(Clone, Debug)]
+pub struct OCPTWithMetrics {
+    pub ocpt: ProcessForest,
+    pub fitness_percentage: f64,
+    pub precision_percentage: f64,
+    pub f_score: f64,
+    pub sequence_of_choices: Vec<String>,
+}
+
