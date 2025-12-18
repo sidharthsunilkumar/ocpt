@@ -1,4 +1,3 @@
-
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, FixedOffset};
 use std::collections::{HashMap, HashSet};
@@ -221,7 +220,10 @@ pub struct APIResponse {
     pub cut_suggestions_list: CutSuggestionsList,
     pub total_edges_removed: Vec<(String, String, usize)>,
     pub total_edges_added: Vec<(String, String, usize)>,
-    pub cost_to_add_edges: serde_json::Value
+    pub cost_to_add_edges: serde_json::Value,
+    pub precision: f64,
+    pub fitness: f64,
+    pub f_score: f64,
 }
 
 #[derive(serde::Deserialize)]
@@ -235,7 +237,7 @@ pub struct CutSelectedAPIRequest {
     pub cut_selected: CutSuggestion,
     pub total_edges_removed: Vec<(String, String, usize)>,
     pub total_edges_added: Vec<(String, String, usize)>,
-    pub cost_to_add_edges: serde_json::Value
+    pub cost_to_add_edges: serde_json::Value,
 }
 
 #[derive(Clone, Debug)]

@@ -1,7 +1,7 @@
 
 use crate::types::{ProcessForest, TreeNode};
 use crate::add_self_loops::get_traces;
-use std::collections::HashSet;
+use std::collections::{HashSet, HashMap};
 
 fn format_traces_for_precision(traces: Vec<Vec<(String, String, String, String, String)>>, self_loop_activities: &[String]) -> Vec<Vec<String>> {
     // println!("Formatting {} traces for precision calculation...", traces.len());
@@ -463,3 +463,168 @@ fn trace_contains_any_activity(trace: &Vec<(String, String, String, String, Stri
                               activities: &HashSet<String>) -> bool {
     trace.iter().any(|(_, activity, _, _, _)| activities.contains(activity))
 }
+
+fn remove_consecutive_self_loops(trace: Vec<String>) -> Vec<String> {
+    if trace.is_empty() {
+        return trace;
+    }
+    
+    let mut cleaned_trace = Vec::new();
+    let mut prev_activity: Option<String> = None;
+    
+    for activity in trace {
+        // Only add the activity if it's different from the previous one
+        if let Some(ref prev) = prev_activity {
+            if &activity != prev {
+                cleaned_trace.push(activity.clone());
+            }
+        } else {
+            // First activity, always add it
+            cleaned_trace.push(activity.clone());
+        }
+        prev_activity = Some(activity);
+    }
+    
+    cleaned_trace
+}
+
+pub fn find_fitness_and_precision(ocpt: &ProcessForest, file_name: &str) -> (usize, usize, usize, usize, f64, f64, f64) {
+    println!("Starting find_fitness_and_precision...");
+    
+    // Get traces from the file
+    let raw_traces = get_traces(file_name);
+    let total_traces = raw_traces.len();
+    
+    // Step 1: Format traces to extract only activity names
+    let activity_traces: Vec<Vec<String>> = raw_traces.into_iter()
+        .map(|trace| {
+            trace.into_iter()
+                .map(|(_, activity, _, _, _)| activity)
+                .collect()
+        })
+        .collect();
+    
+    // Step 2: Remove consecutive self-loops from each trace
+    let traces: Vec<Vec<String>> = activity_traces.into_iter()
+        .map(|trace| remove_consecutive_self_loops(trace))
+        .collect();
+    
+    // Check for activities that appear multiple times in traces (after self-loop removal)
+    println!("\n--- Checking for repeated activities in traces (after self-loop removal) ---");
+    let mut traces_with_repeats = 0;
+    let mut total_repeat_instances = 0;
+    
+    for (trace_idx, trace) in traces.iter().enumerate() {
+        let mut activity_counts: HashMap<String, usize> = HashMap::new();
+        
+        // Count occurrences of each activity in this trace
+        for activity in trace {
+            *activity_counts.entry(activity.clone()).or_insert(0) += 1;
+        }
+        
+        // Check for activities that appear more than once
+        let repeated_activities: Vec<(String, usize)> = activity_counts.iter()
+            .filter(|(_, count)| **count > 1)
+            .map(|(activity, count)| (activity.clone(), *count))
+            .collect();
+        
+        if !repeated_activities.is_empty() {
+            traces_with_repeats += 1;
+            total_repeat_instances += repeated_activities.len();
+            
+            println!("Trace #{}: Activities appearing multiple times:", trace_idx + 1);
+            for (activity, count) in &repeated_activities {
+                println!("  - '{}' appears {} times", activity, count);
+            }
+            println!("  Full trace: {:?}", trace);
+        }
+    }
+    
+    if traces_with_repeats > 0 {
+        println!("Summary: {} out of {} traces contain repeated activities", traces_with_repeats, traces.len());
+        println!("Total repeated activity instances found: {}", total_repeat_instances);
+    } else {
+        println!("No traces contain repeated activities");
+    }
+    
+    // Remove traces that contain repeated activities
+    let original_traces_count = traces.len();
+    let filtered_traces: Vec<Vec<String>> = traces.into_iter()
+        .filter(|trace| {
+            let mut activity_counts: HashMap<String, usize> = HashMap::new();
+            
+            // Count occurrences of each activity in this trace
+            for activity in trace {
+                *activity_counts.entry(activity.clone()).or_insert(0) += 1;
+            }
+            
+            // Keep only traces without repeated activities
+            !activity_counts.values().any(|&count| count > 1)
+        })
+        .collect();
+    
+    println!("Removed {} traces with repeated activities. {} traces remaining.", 
+             original_traces_count - filtered_traces.len(), filtered_traces.len());
+    println!("--- End of repeated activities check ---\n");
+    
+    // Generate all possible executions from the model
+    let all_executions = if ocpt.is_empty() {
+        Vec::new()
+    } else {
+        generate_all_executions(&ocpt[0])
+    };
+    
+    let total_executions = all_executions.len();
+    
+    // Calculate x: number of executions for which a trace also exists
+    let mut x = 0;
+    for execution in &all_executions {
+        if filtered_traces.contains(execution) {
+            x += 1;
+        }
+    }
+    
+    // Calculate t: number of traces for which a possible execution exists
+    let mut t = 0;
+    for trace in &filtered_traces {
+        if all_executions.contains(trace) {
+            t += 1;
+        }
+    }
+
+    //Fitness and Precision calculations
+    let precision = if total_executions > 0 {
+        x as f64 / total_executions as f64
+    } else {
+        0.0
+    };
+
+    let fitness = if total_traces > 0 {
+        t as f64 / total_traces as f64
+    } else {
+        0.0
+    };
+
+    // Calculate F1 Score = 2 * (Precision * Fitness) / (Precision + Fitness)
+    let f_score = if (precision + fitness) > 0.0 {
+        2.0 * (precision * fitness) / (precision + fitness)
+    } else {
+        0.0
+    };
+
+    // Print the results
+    println!("=== Find Fitness and Precision Results ===");
+    println!("Total number of executions: {}", total_executions);
+    println!("Total number of traces: {}", total_traces);
+    // println!("Total number of unique traces: {}", unique_traces.len());
+    println!("x (executions with corresponding trace): {}", x);
+    println!("t (traces with corresponding execution): {}", t);
+    println!("Fitness: {:.5}", fitness);
+    println!("Precision: {:.5}", precision);
+    println!("F-Score: {:.5}", f_score);
+    println!("==========================================");
+    
+    // Return all calculated variables
+    (total_executions, total_traces, x, t, fitness, precision, f_score)
+}
+

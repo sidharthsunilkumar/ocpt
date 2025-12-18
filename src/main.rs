@@ -32,15 +32,15 @@ mod cost_to_add;
 mod cost_to_cut;
 mod good_cuts;
 use crate::cost_to_add::cost_of_adding_edge;
-use axum::extract::Json as AxumJson;
-use axum::extract::Path;
+use axum::extract::{DefaultBodyLimit, Json as AxumJson, Multipart, Path};
 use axum::http::StatusCode;
+use tokio::io::AsyncWriteExt;
 
 // Include the conformance checking modules
 mod conformance_checking;
 mod conformance_checking_mine;
 use conformance_checking::{calculate_conformance_metrics, ConformanceMetrics};
-use conformance_checking_mine::{conformance_checking_mine_fitness, conformance_checking_mine_precision};
+use conformance_checking_mine::{conformance_checking_mine_fitness, conformance_checking_mine_precision, find_fitness_and_precision};
 
 //For REST API server
 use axum::Json;
@@ -51,9 +51,7 @@ use tokio::fs as tokiofs;
 // };
 use axum::{Router, response::Html, routing::get};
 use tower_http::cors::{Any, CorsLayer};
-// use tower::ServiceExt;
-// use axum::http::{HeaderValue, Method};
-// use tower_http::cors::CorsLayer;
+// use tower_http::limit::RequestBodyLimitLayer;
 use serde_json::Value;
 
 // GET / — serves the content of dfg.json as JSON
@@ -68,15 +66,153 @@ async fn hello() -> Json<Value> {
 }
 
 
-async fn getInitialResponse() -> Json<Value> {
+// Handler for POST /upload
+// Expects multipart/form-data with one field named "file".
+async fn upload_handler(mut multipart: Multipart) -> Result<Json<Value>, StatusCode> {
+    println!("Upload handler called - processing multipart upload...");
+
+    stdfs::create_dir_all("data").map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    while let Some(field) = multipart.next_field().await.map_err(|e| {
+        println!("Multipart error getting next field: {:?}", e);
+        StatusCode::BAD_REQUEST
+    })? {
+        let name = field.name().unwrap_or("");
+        println!("Processing field: {}", name);
+
+        if name != "file" {
+            continue;
+        }
+
+        let filename = field
+            .file_name()
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "upload.json".to_string());
+
+        if filename.contains("..") || filename.contains('/') || filename.contains('\\') {
+            return Ok(Json(serde_json::json!({
+                "success": false,
+                "message": "Invalid filename"
+            })));
+        }
+
+        if !filename.ends_with(".json") && !filename.ends_with(".jsonocel") {
+            return Ok(Json(serde_json::json!({
+                "success": false,
+                "message": "Only JSON and JSONOCEL files are allowed"
+            })));
+        }
+
+        let file_path = format!("data/{}", filename);
+        let tmp_path = format!("{}.uploading", file_path);
+        println!("Saving upload to temp file: {}", tmp_path);
+
+    let mut out = tokiofs::File::create(&tmp_path)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+        let mut total_bytes: u64 = 0;
+        let mut field = field;
+
+        loop {
+            match field.chunk().await {
+                Ok(Some(chunk)) => {
+                    total_bytes += chunk.len() as u64;
+                    if let Err(e) = out.write_all(&chunk).await {
+                        println!("Failed writing upload chunk: {:?}", e);
+                        let _ = tokiofs::remove_file(&tmp_path).await;
+                        return Ok(Json(serde_json::json!({
+                            "success": false,
+                            "message": "Failed writing uploaded file",
+                            "received_bytes": total_bytes,
+                            "tmp_path": tmp_path
+                        })));
+                    }
+                }
+                Ok(None) => {
+                    // End of stream
+                    break;
+                }
+                Err(e) => {
+                    // This is the case you're hitting: stream aborted mid-upload.
+                    println!("Multipart stream aborted: {:?}", e);
+                    let _ = tokiofs::remove_file(&tmp_path).await;
+                    return Ok(Json(serde_json::json!({
+                        "success": false,
+                        "message": "Upload stream aborted before completion",
+                        "received_bytes": total_bytes,
+                        "error": format!("{}", e)
+                    })));
+                }
+            }
+        }
+
+        if let Err(e) = out.flush().await {
+            println!("Failed flushing file: {:?}", e);
+            let _ = tokiofs::remove_file(&tmp_path).await;
+            return Ok(Json(serde_json::json!({
+                "success": false,
+                "message": "Failed flushing uploaded file",
+                "received_bytes": total_bytes
+            })));
+        }
+
+        // Publish the file only after fully written.
+        let _ = tokiofs::remove_file(&file_path).await;
+        if let Err(e) = tokiofs::rename(&tmp_path, &file_path).await {
+            println!("Failed renaming temp upload: {:?}", e);
+            let _ = tokiofs::remove_file(&tmp_path).await;
+            return Ok(Json(serde_json::json!({
+                "success": false,
+                "message": "Failed finalizing uploaded file",
+                "received_bytes": total_bytes
+            })));
+        }
+
+        let saved_size = tokiofs::metadata(&file_path)
+            .await
+            .map(|m| m.len())
+            .unwrap_or(0);
+
+        println!(
+            "Upload saved: {} (received {} bytes, saved {} bytes)",
+            file_path, total_bytes, saved_size
+        );
+
+        return Ok(Json(serde_json::json!({
+            "success": true,
+            "message": "File uploaded successfully!",
+            "filename": filename,
+            "path": file_path,
+            "received_bytes": total_bytes,
+            "saved_bytes": saved_size
+        })));
+    }
+
+    Ok(Json(serde_json::json!({
+        "success": false,
+        "message": "No 'file' field found in multipart upload"
+    })))
+}
+
+async fn get_initial_response(Path(file_name): Path<String>) -> Json<Value> {
+    process_response(file_name).await
+}
+
+async fn get_initial_response_default() -> Json<Value> {
+    process_response("order-management".to_string()).await
+}
+
+async fn process_response(file_name_input: String) -> Json<Value> {
 
     println!("Starting...");
 
     // Changed to use OCEL 2.0 format
-    let file_name ="order-management";
-    // let file_name ="ContainerLogistics";
-    // let file_name ="ocel2-p2p";
-    // let file_name ="age_of_empires_ocel2";
+    let file_name = if file_name_input.is_empty() {
+        "order-management"
+    } else {
+        &file_name_input
+    };
     
     let file_path = format!("data/{}.json", file_name);
 
@@ -135,6 +271,7 @@ async fn getInitialResponse() -> Json<Value> {
     let filtered_dfg = filter_dfg(&dfg, &remove_list);
     let filtered_activities = filter_activities(&all_activities, &remove_list);
 
+    
 
     let json_dfg: Value = format_conversion::dfg_to_json(&dfg);
 
@@ -168,6 +305,9 @@ async fn getInitialResponse() -> Json<Value> {
         total_edges_added: Vec::new(),
         total_edges_removed: Vec::new(),
         cost_to_add_edges: serde_json::json!({}),
+        precision: 0.0,
+        fitness: 0.0,
+        f_score: 0.0,
     };
 
     // // Convert to JSON string
@@ -204,6 +344,40 @@ async fn getInitialResponse() -> Json<Value> {
         response.cut_suggestions_list = cut_suggestions_list;
     } else {
         println!("No disjoint activities found in the OCPT");
+
+        // Get the modified OCPT with self-loops added
+        let (modified_ocpt, self_loop_activities) = add_self_loops(&dfg.clone(), &process_forest, file_name);
+        println!("Self-loop activities processed: {:?}", self_loop_activities);
+        
+        // Update the response with the modified OCPT
+        let modified_ocpt_json_string = process_forest_to_json(&modified_ocpt);
+        response.OCPT = modified_ocpt_json_string;
+
+        // // Perform custom conformance checking
+        // println!("\n--- Custom Conformance Analysis ---");
+        // let fitness_percentage = conformance_checking_mine_fitness(&modified_ocpt, file_name);
+        
+        // // Calculate precision (all possible executions)
+        // println!("\n--- Precision Analysis ---");
+        // let precision_percentage = conformance_checking_mine_precision(&modified_ocpt, &self_loop_activities, file_name);
+        
+        // // Calculate F1 Score = 2 * (Precision * Fitness) / (Precision + Fitness)
+        // let f_score = if (precision_percentage + fitness_percentage) > 0.0 {
+        //     2.0 * (precision_percentage * fitness_percentage) / (precision_percentage + fitness_percentage)
+        // } else {
+        //     0.0
+        // };
+
+        // println!("Summary: Fitness = {:.2}%, Precision = {:.2}%, F1-Score = {:.2}%", 
+        //          fitness_percentage, precision_percentage, f_score);
+        
+        // Call find_fitness_and_precision function
+        println!("\n--- Find Fitness and Precision Analysis ---");
+        let (_, _, _, _, fitness, precision, f_score) = find_fitness_and_precision(&modified_ocpt, file_name);
+        
+        response.fitness = fitness;
+        response.precision = precision;
+        response.f_score = f_score;
     }
 
     Json(serde_json::to_value(response).unwrap())
@@ -269,8 +443,8 @@ async fn all_possible_ocpts() -> Json<Value> {
     println!("Starting all_possible_ocpts...");
 
     // Initial setup - same as getInitialResponse
-    // let file_name = "order-management";
-    let file_name = "ocel2-p2p";
+    let file_name = "order-management";
+    // let file_name = "ocel2-p2p";
     // let file_name = "ContainerLogistics";
     // let file_name = "age_of_empires_ocel2";
     let file_path = format!("data/{}.json", file_name);
@@ -405,11 +579,15 @@ async fn all_possible_ocpts() -> Json<Value> {
         } else {
             println!("No disjoint activities found. Adding to final OCPTs.");
             
-            // Apply self-loops for complete process forest
-            let (final_ocpt, self_loop_activities) = add_self_loops(&current_state.dfg, &current_state.ocpt, file_name);
-            self_loop_activities_list = self_loop_activities.clone();
-            // println!("Self-loop activities processed: {:?}", self_loop_activities);
-            all_final_ocpts.push(final_ocpt);
+            // // Apply self-loops for complete process forest
+            // let (final_ocpt, self_loop_activities) = add_self_loops(&current_state.dfg, &current_state.ocpt, file_name);
+            // self_loop_activities_list = self_loop_activities.clone();
+            // // println!("Self-loop activities processed: {:?}", self_loop_activities);
+            // all_final_ocpts.push(final_ocpt);
+            // all_final_sequences.push(current_state.sequence_of_choices.clone());
+
+            // TEMP
+            all_final_ocpts.push(current_state.ocpt);
             all_final_sequences.push(current_state.sequence_of_choices.clone());
         }
 
@@ -425,32 +603,41 @@ async fn all_possible_ocpts() -> Json<Value> {
     for (i, (final_ocpt, sequence_of_choices)) in all_final_ocpts.iter().zip(all_final_sequences.iter()).enumerate() {
         println!("\n>>> FINAL OCPT #{} <<<", i + 1);
         println!("Sequence of choices: {:?}", sequence_of_choices);
-        print_process_forest(final_ocpt);
-        println!("JSON representation:");
+        // print_process_forest(final_ocpt);
+        // println!("JSON representation:");
         let json_string = process_forest_to_json(final_ocpt);
-        println!("{}", json_string);
+        // println!("{}", json_string);
         
         // // Perform conformance checking for this OCPT
         // println!("\n--- Conformance Analysis for OCPT #{} ---", i + 1);
         // test_conformance(json_string.clone());
         
-        // Perform custom conformance checking
-        println!("\n--- Custom Conformance Analysis for OCPT #{} ---", i + 1);
-        let fitness_percentage = conformance_checking_mine_fitness(final_ocpt, file_name);
+        // // Perform custom conformance checking
+        // println!("\n--- Custom Conformance Analysis for OCPT #{} ---", i + 1);
+        // let fitness_percentage = conformance_checking_mine_fitness(final_ocpt, file_name);
         
-        // Calculate precision (all possible executions)
-        println!("\n--- Precision Analysis for OCPT #{} ---", i + 1);
-        let precision_percentage = conformance_checking_mine_precision(final_ocpt, &self_loop_activities_list, file_name);
+        // // Calculate precision (all possible executions)
+        // println!("\n--- Precision Analysis for OCPT #{} ---", i + 1);
+        // let precision_percentage = conformance_checking_mine_precision(final_ocpt, &self_loop_activities_list, file_name);
         
-        // Calculate F1 Score = 2 * (Precision * Fitness) / (Precision + Fitness)
-        let f_score = if (precision_percentage + fitness_percentage) > 0.0 {
-            2.0 * (precision_percentage * fitness_percentage) / (precision_percentage + fitness_percentage)
-        } else {
-            0.0
-        };
+        // // Calculate F1 Score = 2 * (Precision * Fitness) / (Precision + Fitness)
+        // let f_score = if (precision_percentage + fitness_percentage) > 0.0 {
+        //     2.0 * (precision_percentage * fitness_percentage) / (precision_percentage + fitness_percentage)
+        // } else {
+        //     0.0
+        // };
 
-        println!("Summary for OCPT #{}: Fitness = {:.2}%, Precision = {:.2}%, F1-Score = {:.2}%", 
-                 i + 1, fitness_percentage, precision_percentage, f_score);
+        // println!("Summary for OCPT #{}: Fitness = {:.2}%, Precision = {:.2}%, F1-Score = {:.2}%", 
+        //          i + 1, fitness_percentage, precision_percentage, f_score);
+
+        
+        // Call find_fitness_and_precision function
+        println!("\n--- Find Fitness and Precision Analysis for OCPT #{} ---", i + 1);
+        let (total_executions, total_traces, x, t, fitness, precision, f_score) = find_fitness_and_precision(final_ocpt, file_name);
+        
+        // Convert to percentages for compatibility
+        let fitness_percentage = fitness * 100.0;
+        let precision_percentage = precision * 100.0;
 
         // Create OCPTWithMetrics object and add to list
         let ocpt_with_metrics = OCPTWithMetrics {
@@ -534,13 +721,33 @@ async fn all_possible_ocpts() -> Json<Value> {
     Json(response)
 }
 
-// Handler for POST /cut-selected
+// Handler for POST /cut-selected/:file_name
 async fn cut_selected_handler(
+    Path(file_name): Path<String>,
     AxumJson(payload): AxumJson<CutSelectedAPIRequest>,
+) -> Json<Value> {
+    process_cut_selected(file_name, payload).await
+}
+
+// Handler for POST /cut-selected (default)
+async fn cut_selected_handler_default(
+    AxumJson(payload): AxumJson<CutSelectedAPIRequest>,
+) -> Json<Value> {
+    process_cut_selected("order-management".to_string(), payload).await
+}
+
+async fn process_cut_selected(
+    file_name_input: String,
+    payload: CutSelectedAPIRequest,
 ) -> Json<Value> {
     println!("Received cut-selected request: {:?}", payload.cut_selected);
 
-    let file_name = "order-management";
+    let file_name = if file_name_input.is_empty() {
+        "order-management"
+    } else {
+        &file_name_input
+    };
+    
     let mut ocpt: ProcessForest = from_json_value(&payload.ocpt);
     let mut dfg: HashMap<(String, String), usize> = json_to_dfg(&payload.dfg);
     let global_start_activities: HashSet<String> = payload.start_activities;
@@ -615,6 +822,9 @@ async fn cut_selected_handler(
         total_edges_added: total_edges_added.clone(),
         total_edges_removed: total_edges_removed.clone(),
         cost_to_add_edges: json_cost_to_add_edges,
+        precision: 0.0,
+        fitness: 0.0,
+        f_score: 0.0,
     };
 
     // // Convert to JSON string
@@ -642,24 +852,40 @@ async fn cut_selected_handler(
     } else {
         println!("No disjoint activities found in the OCPT");
 
+        // // Get the modified OCPT with self-loops added
+        // let (modified_ocpt, self_loop_activities) = add_self_loops(&dfg.clone(), &ocpt, file_name);
+        // println!("Self-loop activities processed: {:?}", self_loop_activities);
+        
+        // // Update the response with the modified OCPT
+        // let modified_ocpt_json_string = process_forest_to_json(&modified_ocpt);
+        // response.OCPT = modified_ocpt_json_string;
+
+        // // add code to find precision
+        // println!("\n--- Precision Analysis ---");
+        // let precision_percentage = conformance_checking_mine_precision(&modified_ocpt, &self_loop_activities, file_name);
+        
+        // println!("Final OCPT Precision: {:.2}%", precision_percentage);
+
+        // test_conformance(response.OCPT.clone());
+
+        
+
+        // Call find_fitness_and_precision function
+        println!("\n--- Find Fitness and Precision Analysis ---");
+        let (_, _, _, _, fitness, precision, f_score) = find_fitness_and_precision(&ocpt, file_name);
+
         // Get the modified OCPT with self-loops added
         let (modified_ocpt, self_loop_activities) = add_self_loops(&dfg.clone(), &ocpt, file_name);
         println!("Self-loop activities processed: {:?}", self_loop_activities);
         
-        // Update the response with the modified OCPT
+        // TEMP
+         // Update the response with the modified OCPT
         let modified_ocpt_json_string = process_forest_to_json(&modified_ocpt);
         response.OCPT = modified_ocpt_json_string;
 
-        // add code to find precision
-        println!("\n--- Precision Analysis ---");
-        let precision_percentage = conformance_checking_mine_precision(&modified_ocpt, &self_loop_activities, file_name);
-        
-        println!("Final OCPT Precision: {:.2}%", precision_percentage);
-
-        test_conformance(response.OCPT.clone());
-
-        
-
+        response.fitness = fitness;
+        response.precision = precision;
+        response.f_score = f_score;
     }
     Json(serde_json::to_value(response).unwrap())
 }
@@ -753,10 +979,14 @@ async fn main() {
 
     println!("Configuring routes...");
     let app = Router::new()
-        .route("/", get(getInitialResponse))
+        .route("/", get(get_initial_response_default))
+        .route("/:file_name", get(get_initial_response))
         .route("/dfg", get(hello))
         .route("/all-possible-ocpts", get(all_possible_ocpts))
-        .route("/cut-selected", axum::routing::post(cut_selected_handler))
+        .route("/cut-selected", axum::routing::post(cut_selected_handler_default))
+        .route("/cut-selected/:file_name", axum::routing::post(cut_selected_handler))
+        .route("/upload", axum::routing::post(upload_handler))
+        .layer(DefaultBodyLimit::max(200 * 1024 * 1024)) // 200MB limit
         .layer(cors);
     
     println!("Routes configured:");
@@ -764,10 +994,16 @@ async fn main() {
     println!("  GET /dfg");
     println!("  GET /all-possible-ocpts");
     println!("  POST /cut-selected");
+    println!("  POST /upload");
     println!("Server running on http://localhost:1080");
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:1080").await.unwrap();
-    axum::serve(listener, app).await.unwrap();
+    
+    // Configure the server with appropriate settings for large uploads
+    axum::serve(listener, app)
+        .tcp_nodelay(true)
+        .await
+        .unwrap();
 }
 
 fn log_sorted_map<T: std::fmt::Debug + Ord, U: std::fmt::Debug>(

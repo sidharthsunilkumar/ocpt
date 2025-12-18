@@ -79,7 +79,6 @@ pub fn get_divergence_free_graph_v2(
             let current_activity = &current_relation.1;
             let next_activity = &next_relation.1;
             let current_otype = &current_relation.4;
-            let next_otype = &next_relation.4;
 
             // Check divergence condition before adding to DFG
             let should_skip = if let (Some(current_divergent), Some(next_divergent)) = (
@@ -96,6 +95,17 @@ pub fn get_divergence_free_graph_v2(
                 let edge = (current_activity.clone(), next_activity.clone());
                 *dfg.entry(edge).or_insert(0) += 1;
             }
+        }
+    }
+
+    // Iterate over dfg to compute total number of edges
+    let total_edges: usize = dfg.values().copied().sum();
+
+    // Convert counts to rounded percentage values
+    if total_edges > 0 {
+        for value in dfg.values_mut() {
+            let pct = ((*value as f64) / (total_edges as f64) * 100.0).ceil() as usize;
+            *value = pct;
         }
     }
 
