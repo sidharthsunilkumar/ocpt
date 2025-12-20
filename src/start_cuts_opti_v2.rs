@@ -3,6 +3,7 @@ use crate::best_parallel_cut::best_parallel_cut;
 use crate::best_parallel_cut_exhaustive::best_parallel_cut_exhaustive;
 use crate::best_parallel_cut_v2::best_parallel_cut_v2;
 use crate::best_parallel_cut_v3::best_parallel_cut_v3;
+use crate::best_parallel_cut_v4::best_parallel_cut_v4;
 use crate::best_redo_cuts::best_redo_cut;
 use crate::best_sequence_cut::best_sequence_cut;
 use crate::best_sequence_cut_v2;
@@ -305,7 +306,7 @@ pub fn find_best_possible_cuts(
         bp_set1,
         bp_set2,
         bp_new_dfg,
-    ) = best_parallel_cut_v3(&filtered_dfg, &all_activities, &cost_to_add_edges);
+    ) = best_parallel_cut_v4(&filtered_dfg, &all_activities, &cost_to_add_edges, &start_activities, &end_activities);
     if bp_set1.is_empty() || bp_set2.is_empty() {
         println!("Best parallel cut possible condition failed: one of the sets is empty");
     } else {
@@ -767,18 +768,6 @@ fn parallel_cut_condition_check(
     let cond2 = !set1.is_disjoint(end_activities);
     let cond3 = !set2.is_disjoint(start_activities);
     let cond4 = !set2.is_disjoint(end_activities);
-
-    println!("Parallel cut condition check:");
-    println!("  set1: {:?}", set1);
-    println!("  set2: {:?}", set2);
-    println!("  start_activities: {:?}", start_activities);
-    println!("  end_activities: {:?}", end_activities);
-    println!("  cond1 (set1 has start activities): {}", cond1);
-    println!("  cond2 (set1 has end activities): {}", cond2);
-    println!("  cond3 (set2 has start activities): {}", cond3);
-    println!("  cond4 (set2 has end activities): {}", cond4);
-
-    return (true, Vec::new());
 
     if !(cond1 && cond2 && cond3 && cond4) {
         println!("  Parallel cut failed due to start/end activity conditions");

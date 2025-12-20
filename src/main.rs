@@ -25,6 +25,7 @@ mod best_parallel_cut;
 mod best_parallel_cut_exhaustive;
 mod best_parallel_cut_v2;
 mod best_parallel_cut_v3;
+mod best_parallel_cut_v4;
 mod best_redo_cuts;
 mod best_sequence_cut;
 mod best_sequence_cut_v2;
