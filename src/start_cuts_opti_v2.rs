@@ -17,6 +17,7 @@ use crate::types::{ProcessForest, TreeNode};
 use itertools::Itertools;
 use log::info;
 use std::collections::{HashMap, HashSet, VecDeque};
+use uuid::Uuid;
 
 pub fn find_cuts_start(
     dfg: &HashMap<(String, String), usize>,
@@ -32,6 +33,7 @@ pub fn find_cuts_start(
     if n == 1 {
         // Base case: single activity, create a leaf node
         let node = TreeNode {
+            id: Uuid::new_v4().to_string(),
             label: activities[0].clone(),
             children: Vec::new(),
         };
@@ -53,6 +55,7 @@ pub fn find_cuts_start(
     {
         info!("Exclusive cut found: {:?} (X) {:?}", excl_set1, excl_set2);
         let mut node = TreeNode {
+            id: Uuid::new_v4().to_string(),
             label: "exclusive".to_string(),
             children: Vec::new(),
         };
@@ -80,6 +83,7 @@ pub fn find_cuts_start(
     {
         info!("Sequence cut found: {:?} (->) {:?}", seq_set1, seq_set2);
         let mut node = TreeNode {
+            id: Uuid::new_v4().to_string(),
             label: "sequence".to_string(),
             children: Vec::new(),
         };
@@ -108,6 +112,7 @@ pub fn find_cuts_start(
     {
         info!("Parallel cut found: {:?} (||) {:?}", para_set1, para_set2);
         let mut node = TreeNode {
+            id: Uuid::new_v4().to_string(),
             label: "parallel".to_string(),
             children: Vec::new(),
         };
@@ -147,6 +152,7 @@ pub fn find_cuts_start(
     {
         info!("Redo cut found: {:?} (R) {:?}", redo_set1, redo_set2);
         let mut node = TreeNode {
+            id: Uuid::new_v4().to_string(),
             label: "redo".to_string(),
             children: Vec::new(),
         };
@@ -173,6 +179,7 @@ pub fn find_cuts_start(
 
     // If no valid cuts are found, create a flower node with disjoint activities as children
     let mut flower_node = TreeNode {
+        id: Uuid::new_v4().to_string(),
         label: "flower".to_string(),
         children: Vec::new(),
     };
@@ -180,6 +187,7 @@ pub fn find_cuts_start(
     // Add all activities as children of the flower node
     for activity in activities {
         let child_node = TreeNode {
+            id: Uuid::new_v4().to_string(),
             label: activity,
             children: Vec::new(),
         };
@@ -385,6 +393,190 @@ pub fn find_best_possible_cuts(
     cut_suggestions_list
     
 }
+
+pub fn find_cuts_for_node_modification(
+    dfg: &HashMap<(String, String), usize>,
+    all_activities: &HashSet<String>,
+    start_activities: &HashSet<String>,
+    end_activities: &HashSet<String>,
+) -> ProcessForest {
+    let mut forest = Vec::new();
+
+    let activities: Vec<String> = all_activities.clone().into_iter().collect();
+    let n = activities.len();
+
+    if n == 1 {
+        // Base case: single activity, create a leaf node
+        let node = TreeNode {
+            id: Uuid::new_v4().to_string(),
+            label: activities[0].clone(),
+            children: Vec::new(),
+        };
+        forest.push(node);
+        return forest;
+    }
+
+    let filtered_dfg = filter_keep_dfg(&dfg, &all_activities);
+    let (start_activities, end_activities) =
+        get_start_and_end_activities(&dfg, &all_activities, &start_activities, &end_activities);
+
+    // ----- perform cuts--------
+
+    let (excl_set1, excl_set2) = find_exclusive_choice_cut(&filtered_dfg, &all_activities);
+    let (is_exclusive_possible, _excl_failures) = exclusive_cut_condition_check(&filtered_dfg, &excl_set1, &excl_set2);
+    if (!excl_set1.is_empty()
+        && !excl_set2.is_empty()
+        && is_exclusive_possible)
+    {
+        info!("Exclusive cut found: {:?} (X) {:?}", excl_set1, excl_set2);
+        let mut node = TreeNode {
+            id: Uuid::new_v4().to_string(),
+            label: "exclusive".to_string(),
+            children: Vec::new(),
+        };
+        node.children.extend(find_cuts_start(
+            &dfg,
+            &excl_set1,
+            &start_activities,
+            &end_activities,
+        ));
+        node.children.extend(find_cuts_start(
+            &dfg,
+            &excl_set2,
+            &start_activities,
+            &end_activities,
+        ));
+        forest.push(node);
+        return forest;
+    }
+
+    let (seq_set1, seq_set2) = find_sequence_cut(&filtered_dfg, &all_activities);
+    let (is_sequence_possible, _seq_failures) = sequence_cut_condition_check(&filtered_dfg, &seq_set1, &seq_set2);
+    if (!seq_set1.is_empty()
+        && !seq_set2.is_empty()
+        && is_sequence_possible)
+    {
+        info!("Sequence cut found: {:?} (->) {:?}", seq_set1, seq_set2);
+        let mut node = TreeNode {
+            id: Uuid::new_v4().to_string(),
+            label: "sequence".to_string(),
+            children: Vec::new(),
+        };
+        node.children.extend(find_cuts_start(
+            &dfg,
+            &seq_set1,
+            &start_activities,
+            &end_activities,
+        ));
+        node.children.extend(find_cuts_start(
+            &dfg,
+            &seq_set2,
+            &start_activities,
+            &end_activities,
+        ));
+        forest.push(node);
+        return forest;
+    }
+
+    let (is_parallel, para_set1, para_set2) = find_parallel_cut(&filtered_dfg, &all_activities);
+    let (parallel_condition_passed, _parallel_failures) = parallel_cut_condition_check(&filtered_dfg, &para_set1, &para_set2, &start_activities, &end_activities);
+    if (is_parallel
+        && !para_set1.is_empty()
+        && !para_set2.is_empty()
+        && parallel_condition_passed)
+    {
+        info!("Parallel cut found: {:?} (||) {:?}", para_set1, para_set2);
+        let mut node = TreeNode {
+            id: Uuid::new_v4().to_string(),
+            label: "parallel".to_string(),
+            children: Vec::new(),
+        };
+        node.children.extend(find_cuts_start(
+            &dfg,
+            &para_set1,
+            &start_activities,
+            &end_activities,
+        ));
+        node.children.extend(find_cuts_start(
+            &dfg,
+            &para_set2,
+            &start_activities,
+            &end_activities,
+        ));
+        forest.push(node);
+        return forest;
+    }
+
+    let (is_redo, redo_set1, redo_set2) = find_redo_cut(
+        &filtered_dfg,
+        &all_activities,
+        &start_activities,
+        &end_activities,
+    );
+    let (redo_condition_passed, _redo_failures) = redo_cut_condition_check(
+        &filtered_dfg,
+        &redo_set1,
+        &redo_set2,
+        &start_activities,
+        &end_activities,
+    );
+    if (is_redo
+        && !redo_set2.is_empty()
+        && !redo_set1.is_empty()
+        && redo_condition_passed)
+    {
+        info!("Redo cut found: {:?} (R) {:?}", redo_set1, redo_set2);
+        let mut node = TreeNode {
+            id: Uuid::new_v4().to_string(),
+            label: "redo".to_string(),
+            children: Vec::new(),
+        };
+        node.children.extend(find_cuts_start(
+            &dfg,
+            &redo_set1,
+            &start_activities,
+            &end_activities,
+        ));
+        node.children.extend(find_cuts_start(
+            &dfg,
+            &redo_set2,
+            &start_activities,
+            &end_activities,
+        ));
+        forest.push(node);
+        return forest;
+    }
+
+    info!(
+        "No further cuts found for the current set of activities: {:?}",
+        all_activities
+    );
+
+    // If no valid cuts are found, create a flower node with disjoint activities as children
+    let mut flower_node = TreeNode {
+        id: Uuid::new_v4().to_string(),
+        label: "flower".to_string(),
+        children: Vec::new(),
+    };
+
+    // Add all activities as children of the flower node
+    for activity in activities {
+        let child_node = TreeNode {
+            id: Uuid::new_v4().to_string(),
+            label: activity,
+            children: Vec::new(),
+        };
+        flower_node.children.push(child_node);
+    }
+
+    // Add the flower node to the forest
+    forest.push(flower_node);
+
+    return forest;
+
+}
+
+
 
 // Exclusive cut and helpers --------------
 fn find_exclusive_choice_cut(

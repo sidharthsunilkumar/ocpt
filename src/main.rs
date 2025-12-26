@@ -1,5 +1,5 @@
 use crate::format_conversion::{from_json_value, json_to_dfg, json_to_process_forest, process_forest_to_json, json_to_cost_to_add_edges};
-use crate::types::{APIResponse, CutSelectedAPIRequest, CutSuggestion, CutSuggestionsList, OCEL, ProcessForest, TreeNode, OCPTWithMetrics};
+use crate::types::{APIResponse, CutSelectedAPIRequest, ModifyNodeAPIRequest, CutSuggestion, CutSuggestionsList, OCEL, ProcessForest, TreeNode, OCPTWithMetrics, EdgeModification};
 use serde::Deserialize;
 use simplelog::*;
 use std::collections::{HashMap, HashSet};
@@ -8,6 +8,7 @@ use std::fs as stdfs;
 use std::fs::File;
 use std::io::Write;
 use std::sync::Arc;
+use uuid::Uuid;
 mod add_self_loops;
 mod build_relations_fns;
 mod divergence_free_dfg;
@@ -18,6 +19,7 @@ mod start_cuts;
 mod start_cuts_opti_v1;
 mod start_cuts_opti_v2;
 mod types;
+mod modify_node_helper_fns;
 use log::info;
 use add_self_loops::add_self_loops;
 mod best_exclusive_cut;
@@ -305,6 +307,7 @@ async fn process_response(file_name_input: String) -> Json<Value> {
         },
         total_edges_added: Vec::new(),
         total_edges_removed: Vec::new(),
+        edge_modifications: Vec::new(),
         cost_to_add_edges: serde_json::json!({}),
         precision: 0.0,
         fitness: 0.0,
@@ -757,6 +760,7 @@ async fn process_cut_selected(
     let cut_selected: CutSuggestion = payload.cut_selected;
     let mut total_edges_removed: Vec<(String, String, usize)> = payload.total_edges_removed;
     let mut total_edges_added: Vec<(String, String, usize)> = payload.total_edges_added;
+    let mut edge_modifications: Vec<EdgeModification> = payload.edge_modifications;
     let mut cost_to_add_edges: HashMap<(String, String), f64> = json_to_cost_to_add_edges(&payload.cost_to_add_edges);
 
     println!("old dfg:\n ");
@@ -790,6 +794,7 @@ async fn process_cut_selected(
     );
             
     
+    
 
     println!("old ocpt:\n ");
     print_process_forest(&ocpt);
@@ -808,6 +813,14 @@ async fn process_cut_selected(
     total_edges_removed.extend(cut_selected.edges_to_be_removed.clone());
     total_edges_added.extend(cut_selected.edges_to_be_added.clone());
 
+    let edge_modification = EdgeModification {
+        node_id: new_tree_node.id.clone(),
+        edges_added: cut_selected.edges_to_be_added.clone(),
+        edges_removed: cut_selected.edges_to_be_removed.clone(),
+    };
+    
+    edge_modifications.push(edge_modification);
+
     let json_cost_to_add_edges: Value = format_conversion::cost_to_add_edges_to_json(&cost_to_add_edges);
 
     let mut response:APIResponse = APIResponse {
@@ -822,6 +835,7 @@ async fn process_cut_selected(
         },
         total_edges_added: total_edges_added.clone(),
         total_edges_removed: total_edges_removed.clone(),
+        edge_modifications: edge_modifications,
         cost_to_add_edges: json_cost_to_add_edges,
         precision: 0.0,
         fitness: 0.0,
@@ -890,6 +904,126 @@ async fn process_cut_selected(
     }
     Json(serde_json::to_value(response).unwrap())
 }
+
+
+// Handler for POST /modify-node/:file_name
+async fn modify_node_handler(
+    Path(file_name): Path<String>,
+    AxumJson(payload): AxumJson<ModifyNodeAPIRequest>,
+) -> Json<Value> {
+    process_modify_node(file_name, payload).await
+}
+
+// Handler for POST /modify-node (default)
+async fn modify_node_handler_default(
+    AxumJson(payload): AxumJson<ModifyNodeAPIRequest>,
+) -> Json<Value> {
+    process_modify_node("order-management".to_string(), payload).await
+}
+
+async fn process_modify_node(
+    file_name_input: String,
+    payload: ModifyNodeAPIRequest,
+) -> Json<Value> {
+    println!("Received modify-node request for node: {}", payload.selected_node_id);
+
+    let file_name = if file_name_input.is_empty() {
+        "order-management"
+    } else {
+        &file_name_input
+    };
+    
+    let selected_node_id: String = payload.selected_node_id;
+    let mut ocpt: ProcessForest = from_json_value(&payload.ocpt);
+    let mut dfg: HashMap<(String, String), usize> = json_to_dfg(&payload.dfg);
+    let global_start_activities: HashSet<String> = payload.start_activities;
+    let global_end_activities: HashSet<String> = payload.end_activities;
+    let mut total_edges_removed: Vec<(String, String, usize)> = payload.total_edges_removed;
+    let mut total_edges_added: Vec<(String, String, usize)> = payload.total_edges_added;
+    let mut edge_modifications: Vec<EdgeModification> = payload.edge_modifications;
+    let mut cost_to_add_edges: HashMap<(String, String), f64> = json_to_cost_to_add_edges(&payload.cost_to_add_edges);
+
+    // TODO: Implement node modification logic here
+    
+
+    // call find_ids_of_descendants with selected_node_id and put that in a variable
+    let descendants_ids = modify_node_helper_fns::find_ids_of_descendants(&ocpt, &selected_node_id);
+    println!("Descendants IDs: {:?}", descendants_ids);
+
+    for descendant_id in &descendants_ids {
+        if let Some(modification) = edge_modifications.iter().find(|m| m.node_id == *descendant_id).cloned() {
+            // Revert edges removed: remove from total_edges_removed, add to dfg
+            for (from, to, weight) in modification.edges_removed {
+                if let Some(pos) = total_edges_removed.iter().position(|(f, t, _)| *f == from && *t == to) {
+                    total_edges_removed.remove(pos);
+                }
+                dfg.insert((from, to), weight);
+            }
+
+            // Revert edges added: remove from total_edges_added, remove from dfg
+            for (from, to, _) in modification.edges_added {
+                if let Some(pos) = total_edges_added.iter().position(|(f, t, _)| *f == from && *t == to) {
+                    total_edges_added.remove(pos);
+                }
+                dfg.remove(&(from, to));
+            }
+        }
+    }
+
+    // Remove the modifications from the list
+    edge_modifications.retain(|m| !descendants_ids.contains(&m.node_id));
+
+    // Modify ocpt by removing decendants
+    let (new_ocpt, removed_activities) = modify_node_helper_fns::replace_node_and_descendants(ocpt, &selected_node_id);
+    ocpt = new_ocpt;
+    println!("Removed labels from OCPT: {:?}", removed_activities);
+
+    let json_dfg: Value = format_conversion::dfg_to_json(&dfg);
+    let json_cost_to_add_edges: Value = format_conversion::cost_to_add_edges_to_json(&cost_to_add_edges);
+
+    let mut response:APIResponse = APIResponse {
+        OCPT: serde_json::Value::String(String::new()),
+        dfg: json_dfg,
+        start_activities: global_start_activities.clone(),
+        end_activities: global_end_activities.clone(),
+        is_perfectly_cut: true,
+        cut_suggestions_list: CutSuggestionsList {
+            all_activities: HashSet::new(),
+            cuts: Vec::new(),
+        },
+        total_edges_added: total_edges_added.clone(),
+        total_edges_removed: total_edges_removed.clone(),
+        edge_modifications: edge_modifications,
+        cost_to_add_edges: json_cost_to_add_edges,
+        precision: 0.0,
+        fitness: 0.0,
+        f_score: 0.0,
+    };
+
+    // // Convert to JSON string
+    let ocpt_json_string = process_forest_to_json(&ocpt);
+    response.OCPT = ocpt_json_string;
+
+    response.is_perfectly_cut = false;
+    let cut_suggestions_list = start_cuts_opti_v2::find_best_possible_cuts(
+        &dfg,
+        &removed_activities,
+        &global_start_activities,
+        &global_end_activities,
+        &cost_to_add_edges
+    );
+    response.cut_suggestions_list = cut_suggestions_list;
+
+
+    
+    Json(serde_json::to_value(response).unwrap())
+}
+
+
+
+
+
+
 
 fn modify_process_forest(
     mut ocpt: ProcessForest,
@@ -965,6 +1099,7 @@ fn create_new_tree_node_by_cut_selection(
     children.extend(process_forest_set1);
     children.extend(process_forest_set2);
     TreeNode {
+        id: Uuid::new_v4().to_string(),
         label: cut_selected.cut_type.clone(),
         children,
     }
@@ -986,6 +1121,8 @@ async fn main() {
         .route("/all-possible-ocpts", get(all_possible_ocpts))
         .route("/cut-selected", axum::routing::post(cut_selected_handler_default))
         .route("/cut-selected/:file_name", axum::routing::post(cut_selected_handler))
+        .route("/modify-node", axum::routing::post(modify_node_handler_default))
+        .route("/modify-node/:file_name", axum::routing::post(modify_node_handler))
         .route("/upload", axum::routing::post(upload_handler))
         .layer(DefaultBodyLimit::max(200 * 1024 * 1024)) // 200MB limit
         .layer(cors);
@@ -995,6 +1132,7 @@ async fn main() {
     println!("  GET /dfg");
     println!("  GET /all-possible-ocpts");
     println!("  POST /cut-selected");
+    println!("  POST /modify-node");
     println!("  POST /upload");
     println!("Server running on http://localhost:1080");
 

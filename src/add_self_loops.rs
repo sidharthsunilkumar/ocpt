@@ -3,6 +3,7 @@ use std::fs as stdfs;
 use crate::types::{OCEL, ProcessForest, TreeNode};
 use crate::build_relations_fns;
 use crate::interaction_patterns;
+use uuid::Uuid;
 
 /// Adds self-loops to a DFG and prints it
 /// 
@@ -303,11 +304,13 @@ fn modify_tree_with_redo(node: &mut TreeNode, self_loop_activity: &str, self_loo
         if child.label == self_loop_activity {
             // Found the self-loop activity as a direct child
             let self_loop_node = TreeNode {
+                id: Uuid::new_v4().to_string(),
                 label: self_loop_activity.to_string(),
                 children: vec![],
             };
             
             let tau_node = TreeNode {
+                id: Uuid::new_v4().to_string(),
                 label: "tau".to_string(),
                 children: vec![],
             };
@@ -319,6 +322,7 @@ fn modify_tree_with_redo(node: &mut TreeNode, self_loop_activity: &str, self_loo
             };
             
             let redo_node = TreeNode {
+                id: Uuid::new_v4().to_string(),
                 label: "redo".to_string(),
                 children: redo_children,
             };

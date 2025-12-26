@@ -3,6 +3,7 @@ use crate::types::{TreeNode, ProcessForest};
 use itertools::Itertools;
 use log::info;
 use crate::cost_to_cut::to_be_non_reachable;
+use uuid::Uuid;
 
 /// Step 1: Tarjan's Algorithm to find SCCs
 pub fn strongly_connected_components(
@@ -647,6 +648,7 @@ pub fn find_cuts(
     if n == 1 {
         // Base case: single activity, create a leaf node
         let node = TreeNode {
+            id: Uuid::new_v4().to_string(),
             label: activities[0].clone(),
             children: Vec::new(),
         };
@@ -726,6 +728,7 @@ pub fn find_cuts(
     // If no valid cuts are found, return disjoint trees
     for activity in activities {
         let node = TreeNode {
+            id: Uuid::new_v4().to_string(),
             label: activity,
             children: Vec::new(),
         };

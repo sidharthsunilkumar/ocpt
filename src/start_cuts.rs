@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 use crate::types::{TreeNode, ProcessForest};
 use itertools::Itertools;
 use log::info;
+use uuid::Uuid;
 
 pub fn find_cuts(
     dfg: &HashMap<(String, String), usize>,
@@ -18,6 +19,7 @@ pub fn find_cuts(
     if n == 1 {
         // Base case: single activity, create a leaf node
         let node = TreeNode {
+            id: Uuid::new_v4().to_string(),
             label: activities[0].clone(),
             children: Vec::new(),
         };
@@ -44,6 +46,7 @@ pub fn find_cuts(
             if excl_cut {
                 info!("Excl parallel cut found: {:?} (X) {:?}", combo_set, complement_set);
                 let mut node = TreeNode {
+                    id: Uuid::new_v4().to_string(),
                     label: "exclusive".to_string(),
                     children: Vec::new(),
                 };
@@ -57,6 +60,7 @@ pub fn find_cuts(
             if seq_cut {
                 info!("Seq parallel cut found: {:?} (->) {:?}", combo_set, complement_set);
                 let mut node = TreeNode {
+                    id: Uuid::new_v4().to_string(),
                     label: "sequence".to_string(),
                     children: Vec::new(),
                 };
@@ -70,6 +74,7 @@ pub fn find_cuts(
             if para_cut {
                 info!("Parallel cut found: {:?} (||) {:?}", combo_set, complement_set);
                 let mut node = TreeNode {
+                    id: Uuid::new_v4().to_string(),
                     label: "parallel".to_string(),
                     children: Vec::new(),
                 };
@@ -83,6 +88,7 @@ pub fn find_cuts(
             if redo_cut {
                 info!("Redo cut found: {:?} (O->) {:?}", combo_set, complement_set);
                 let mut node = TreeNode {
+                    id: Uuid::new_v4().to_string(),
                     label: "redo".to_string(),
                     children: Vec::new(),
                 };
@@ -97,6 +103,7 @@ pub fn find_cuts(
     // If no valid cuts are found, return disjoint trees
     for activity in activities {
         let node = TreeNode {
+            id: Uuid::new_v4().to_string(),
             label: activity,
             children: Vec::new(),
         };

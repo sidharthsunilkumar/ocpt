@@ -167,6 +167,8 @@ where
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TreeNode {
+    #[serde(default)]
+    pub id: String,
     pub label: String,
     pub children: Vec<TreeNode>,
 }
@@ -210,6 +212,13 @@ pub struct CutSuggestionsList {
     pub cuts: Vec<CutSuggestion>
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct EdgeModification {
+    pub node_id: String,
+    pub edges_added: Vec<(String, String, usize)>,
+    pub edges_removed: Vec<(String, String, usize)>,
+}
+
 #[derive(Serialize)]
 pub struct APIResponse {
     pub OCPT: serde_json::Value,
@@ -220,6 +229,7 @@ pub struct APIResponse {
     pub cut_suggestions_list: CutSuggestionsList,
     pub total_edges_removed: Vec<(String, String, usize)>,
     pub total_edges_added: Vec<(String, String, usize)>,
+    pub edge_modifications: Vec<EdgeModification>,
     pub cost_to_add_edges: serde_json::Value,
     pub precision: f64,
     pub fitness: f64,
@@ -237,6 +247,22 @@ pub struct CutSelectedAPIRequest {
     pub cut_selected: CutSuggestion,
     pub total_edges_removed: Vec<(String, String, usize)>,
     pub total_edges_added: Vec<(String, String, usize)>,
+    #[serde(default)]
+    pub edge_modifications: Vec<EdgeModification>,
+    pub cost_to_add_edges: serde_json::Value,
+}
+
+#[derive(serde::Deserialize)]
+pub struct ModifyNodeAPIRequest {
+    pub selected_node_id: String,
+    pub ocpt: serde_json::Value,
+    pub dfg: serde_json::Value,
+    pub start_activities: HashSet<String>,
+    pub end_activities: HashSet<String>,
+    pub total_edges_removed: Vec<(String, String, usize)>,
+    pub total_edges_added: Vec<(String, String, usize)>,
+    #[serde(default)]
+    pub edge_modifications: Vec<EdgeModification>,
     pub cost_to_add_edges: serde_json::Value,
 }
 
