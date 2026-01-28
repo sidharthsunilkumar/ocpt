@@ -494,19 +494,46 @@ pub fn find_fitness_and_precision(ocpt: &ProcessForest, file_name: &str) -> (usi
     // Get traces from the file
     let raw_traces = get_traces(file_name);
     let total_traces = raw_traces.len();
+
+    // // ------------ print all raw_traces
+    // for (i, trace) in raw_traces.iter().enumerate() {
+    //     println!("Raw Trace {}: {:?}", i + 1, trace);
+    // }
     
     // Step 1: Format traces to extract only activity names
-    let activity_traces: Vec<Vec<String>> = raw_traces.into_iter()
+    let activity_traces: Vec<(String, Vec<String>)> = raw_traces.into_iter()
         .map(|trace| {
-            trace.into_iter()
+            let info = if let Some(first_el) = trace.first() {
+                first_el.4.clone()
+            } else {
+                String::new()
+            };
+
+            let activities = trace.into_iter()
                 .map(|(_, activity, _, _, _)| activity)
-                .collect()
+                .collect();
+            
+            (info, activities)
         })
         .collect();
+
+    // // ------------ print all activity_traces
+    // for (i, (info, trace)) in activity_traces.iter().enumerate() {
+    //     println!("Activity Trace {} [{}]: {:?}", i + 1, info, trace);
+    // }
+
+    let mut objects_to_events_map: HashMap<String, HashSet<String>> = HashMap::new();
+    for (info, trace) in &activity_traces {
+        let entry = objects_to_events_map.entry(info.clone()).or_insert_with(HashSet::new);
+        for activity in trace {
+            entry.insert(activity.clone());
+        }
+    }
+    println!("Objects to Events Map: {:?}", objects_to_events_map);
     
     // Step 2: Remove consecutive self-loops from each trace
     let traces: Vec<Vec<String>> = activity_traces.into_iter()
-        .map(|trace| remove_consecutive_self_loops(trace))
+        .map(|(_, trace)| remove_consecutive_self_loops(trace))
         .collect();
     
     // Check for activities that appear multiple times in traces (after self-loop removal)
@@ -562,18 +589,35 @@ pub fn find_fitness_and_precision(ocpt: &ProcessForest, file_name: &str) -> (usi
             !activity_counts.values().any(|&count| count > 1)
         })
         .collect();
+
+    // // -------------- print all filter trace
+    // for (i, trace) in filtered_traces.iter().enumerate() {
+    //     println!("Filtered Trace {}: {:?}", i + 1, trace);
+    // }
     
     println!("Removed {} traces with repeated activities. {} traces remaining.", 
              original_traces_count - filtered_traces.len(), filtered_traces.len());
     println!("--- End of repeated activities check ---\n");
     
     // Generate all possible executions from the model
-    let all_executions = if ocpt.is_empty() {
+    let mut all_executions_no_ot = if ocpt.is_empty() {
         Vec::new()
     } else {
         generate_all_executions(&ocpt[0])
     };
+
+    // // ----------------------- print all executions
+    // for (i, execution) in all_executions_no_ot.iter().enumerate() {
+    //     println!("Execution {}: {:?}", i + 1, execution);
+    // }
+
+    let all_executions = generate_all_execution_by_object_types(&objects_to_events_map, &all_executions_no_ot);
     
+    // // ----------------------- print all generated executions by object types
+    // for (i, execution) in all_executions.iter().enumerate() {
+    //     println!("Generated Execution {}: {:?}", i + 1, execution);
+    // }
+
     let total_executions = all_executions.len();
     
     // Calculate x: number of executions for which a trace also exists
@@ -627,4 +671,27 @@ pub fn find_fitness_and_precision(ocpt: &ProcessForest, file_name: &str) -> (usi
     // Return all calculated variables
     (total_executions, total_traces, x, t, fitness, precision, f_score)
 }
+
+fn generate_all_execution_by_object_types(
+    objects_to_events_map: &HashMap<String, HashSet<String>>,
+    all_executions: &Vec<Vec<String>>
+) -> HashSet<Vec<String>> {
+    let mut executions: HashSet<Vec<String>> = HashSet::new();
+
+    for (_object, events) in objects_to_events_map {
+        for execution in all_executions {
+            let new_execution: Vec<String> = execution.iter()
+                .filter(|s| events.contains(*s))
+                .cloned()
+                .collect();
+            // executions.insert(new_execution);
+             if !new_execution.is_empty() { // Should we check for empty? The prompt implies preserving execution structure just filtered.
+                 executions.insert(new_execution);
+            }
+        }
+    }
+
+    executions
+}
+
 

@@ -11,6 +11,7 @@ use std::sync::Arc;
 use uuid::Uuid;
 mod add_self_loops;
 mod build_relations_fns;
+mod conformance_format;
 mod divergence_free_dfg;
 mod format_conversion;
 mod get_dfg_by_object_type;
@@ -19,6 +20,7 @@ mod start_cuts;
 mod start_cuts_opti_v1;
 mod start_cuts_opti_v2;
 mod types;
+mod conformance_types;
 mod modify_node_helper_fns;
 use log::info;
 use add_self_loops::add_self_loops;
@@ -35,13 +37,14 @@ mod cost_to_add;
 mod cost_to_cut;
 mod good_cuts;
 use crate::cost_to_add::cost_of_adding_edge;
-use axum::extract::{DefaultBodyLimit, Json as AxumJson, Multipart, Path};
+use axum::extract::{DefaultBodyLimit, Json as AxumJson, Multipart, Path, Query};
 use axum::http::StatusCode;
 use tokio::io::AsyncWriteExt;
 
 // Include the conformance checking modules
 mod conformance_checking;
 mod conformance_checking_mine;
+mod conformance_checking_r4pm;
 use conformance_checking::{calculate_conformance_metrics, ConformanceMetrics};
 use conformance_checking_mine::{conformance_checking_mine_fitness, conformance_checking_mine_precision, find_fitness_and_precision};
 
@@ -68,6 +71,25 @@ async fn hello() -> Json<Value> {
     Json(json)
 }
 
+#[derive(Debug, Deserialize)]
+pub struct Params {
+    n: Option<f64>,
+}
+
+
+// // Handler for GET /test-conformance
+// // Tests conformance checking by computing fitness and precision
+// async fn test_conformance_handler() -> Json<Value> {
+    
+//     let (fitness, precision, time_elapsed) = compute_test_fitness_precision();
+    
+//     Json(serde_json::json!({
+//         "fitness": fitness,
+//         "precision": precision,
+//         "time_elapsed_ms": time_elapsed,
+//         "success": true
+//     }))
+// }
 
 // Handler for POST /upload
 // Expects multipart/form-data with one field named "file".
@@ -198,17 +220,22 @@ async fn upload_handler(mut multipart: Multipart) -> Result<Json<Value>, StatusC
     })))
 }
 
-async fn get_initial_response(Path(file_name): Path<String>) -> Json<Value> {
-    process_response(file_name).await
+async fn get_initial_response(
+    Path(file_name): Path<String>,
+    Query(params): Query<Params>,
+) -> Json<Value> {
+    process_response(file_name, params.n).await
 }
 
 async fn get_initial_response_default() -> Json<Value> {
-    process_response("order-management".to_string()).await
+    process_response("order-management".to_string(), None).await
 }
 
-async fn process_response(file_name_input: String) -> Json<Value> {
+async fn process_response(file_name_input: String, n_val: Option<f64>) -> Json<Value> {
 
     println!("Starting...");
+    let n_threshold = n_val.unwrap_or(0.00);
+    println!("Using query param n: {}", n_threshold);
 
     // Changed to use OCEL 2.0 format
     let file_name = if file_name_input.is_empty() {
@@ -225,8 +252,20 @@ async fn process_response(file_name_input: String) -> Json<Value> {
     let relations = build_relations_fns::build_relations(&ocel.events, &ocel.objects);
     // println!("size of relations: {}", relations.len());
 
+    conformance_format::build_ocel_format_for_conformance(&ocel.events, &ocel.objects, &file_name);
+
     let (div, con, rel, defi, all_activities, all_object_types) =
         interaction_patterns::get_interaction_patterns(&relations, &ocel);
+
+    conformance_format::saveInteractionPatterns(&div, &con, &rel, &defi, &file_name);
+
+    println!("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+    println!("Divergent: {:?}", div);
+    println!("Convergent: {:?}", con);
+    println!("Relational: {:?}", rel);
+    println!("Deficiency: {:?}", defi);
+
+
 
     // Get DFGs by object type
     let dfg_sets = get_dfg_by_object_type::get_dfg_by_object_type(&relations, &div);
@@ -261,10 +300,14 @@ async fn process_response(file_name_input: String) -> Json<Value> {
     // log_sorted_map("Relational", &rel);
     // log_sorted_map("Deficiency", &defi);
 
-    let (dfg, start_acts, end_acts) =
+    let (mut dfg, start_acts, end_acts) =
         divergence_free_dfg::get_divergence_free_graph_v2(&relations, &div);
 
     println!("created DFG!");
+    if n_threshold > 0.0 {
+        dfg = noise_reduction(dfg, n_threshold);
+        println!("DFG after noise reduction:");
+    }
 
     print_dfg(&dfg);
 
@@ -376,12 +419,39 @@ async fn process_response(file_name_input: String) -> Json<Value> {
         //          fitness_percentage, precision_percentage, f_score);
         
         // Call find_fitness_and_precision function
-        println!("\n--- Find Fitness and Precision Analysis ---");
-        let (_, _, _, _, fitness, precision, f_score) = find_fitness_and_precision(&modified_ocpt, file_name);
+        // println!("\n--- Find Fitness and Precision Analysis ---");
+        // let (_, _, _, _, fitness, precision, f_score) = find_fitness_and_precision(&modified_ocpt, file_name);
         
-        response.fitness = fitness;
-        response.precision = precision;
-        response.f_score = f_score;
+        // response.fitness = fitness;
+        // response.precision = precision;
+        // response.f_score = f_score;
+
+
+        let mod_ocpt_json_string = process_forest_to_json(&modified_ocpt);
+        let file_path = format!("conformance_files/{}-ocpt-data.json", file_name);
+    
+        // Ensure the directory exists
+        if let Some(parent) = std::path::Path::new(&file_path).parent() {
+            std::fs::create_dir_all(parent).expect("Failed to create directory");
+        }
+
+        let mut file = File::create(file_path).expect("Failed to create file");
+        file.write_all(mod_ocpt_json_string.to_string().as_bytes()).expect("Failed to write to file");
+
+
+
+        let ocpt = conformance_format::build_ocpt_format_for_conformance(&file_name);
+        let (r4pm_fitness, r4pm_precision) = conformance_checking_r4pm::calculate_metrics(&file_name, &ocpt);
+
+        let r4pm_f_score = if (r4pm_precision + r4pm_fitness) > 0.0 {
+            2.0 * (r4pm_precision * r4pm_fitness) / (r4pm_precision + r4pm_fitness)
+        } else {
+            0.0
+        };
+
+        response.fitness = r4pm_fitness;
+        response.precision = r4pm_precision;
+        response.f_score = r4pm_f_score;
     }
 
     Json(serde_json::to_value(response).unwrap())
@@ -845,7 +915,7 @@ async fn process_cut_selected(
     // // Convert to JSON string
     let ocpt_json_string = process_forest_to_json(&ocpt);
     println!("OCPT JSON string:\n{}", ocpt_json_string);
-    response.OCPT = ocpt_json_string;
+    response.OCPT = ocpt_json_string.clone();
 
     let (found_disjoint, disjoint_activities) = collect_disjoint_activities(&ocpt);
 
@@ -883,11 +953,15 @@ async fn process_cut_selected(
 
         // test_conformance(response.OCPT.clone());
 
+
+
+
+
         
 
-        // Call find_fitness_and_precision function
-        println!("\n--- Find Fitness and Precision Analysis ---");
-        let (_, _, _, _, fitness, precision, f_score) = find_fitness_and_precision(&ocpt, file_name);
+        // // Call find_fitness_and_precision function
+        // println!("\n--- Find Fitness and Precision Analysis ---");
+        // let (_, _, _, _, fitness, precision, f_score) = find_fitness_and_precision(&ocpt, file_name);
 
         // Get the modified OCPT with self-loops added
         let (modified_ocpt, self_loop_activities) = add_self_loops(&dfg.clone(), &ocpt, file_name);
@@ -898,9 +972,34 @@ async fn process_cut_selected(
         let modified_ocpt_json_string = process_forest_to_json(&modified_ocpt);
         response.OCPT = modified_ocpt_json_string;
 
-        response.fitness = fitness;
-        response.precision = precision;
-        response.f_score = f_score;
+
+
+        let mod_ocpt_json_string = process_forest_to_json(&modified_ocpt);
+        let file_path = format!("conformance_files/{}-ocpt-data.json", file_name);
+    
+        // Ensure the directory exists
+        if let Some(parent) = std::path::Path::new(&file_path).parent() {
+            std::fs::create_dir_all(parent).expect("Failed to create directory");
+        }
+
+        let mut file = File::create(file_path).expect("Failed to create file");
+        file.write_all(mod_ocpt_json_string.to_string().as_bytes()).expect("Failed to write to file");
+
+
+
+        let ocpt = conformance_format::build_ocpt_format_for_conformance(&file_name);
+        let (r4pm_fitness, r4pm_precision) = conformance_checking_r4pm::calculate_metrics(&file_name, &ocpt);
+
+        let r4pm_f_score = if (r4pm_precision + r4pm_fitness) > 0.0 {
+            2.0 * (r4pm_precision * r4pm_fitness) / (r4pm_precision + r4pm_fitness)
+        } else {
+            0.0
+        };
+
+        response.fitness = r4pm_fitness;
+        response.precision = r4pm_precision;
+        response.f_score = r4pm_f_score;
+
     }
     Json(serde_json::to_value(response).unwrap())
 }
@@ -1119,6 +1218,7 @@ async fn main() {
         .route("/:file_name", get(get_initial_response))
         .route("/dfg", get(hello))
         .route("/all-possible-ocpts", get(all_possible_ocpts))
+        // .route("/test-conformance", get(test_conformance_handler))
         .route("/cut-selected", axum::routing::post(cut_selected_handler_default))
         .route("/cut-selected/:file_name", axum::routing::post(cut_selected_handler))
         .route("/modify-node", axum::routing::post(modify_node_handler_default))
@@ -1131,6 +1231,7 @@ async fn main() {
     println!("  GET /");
     println!("  GET /dfg");
     println!("  GET /all-possible-ocpts");
+    println!("  GET /test-conformance");
     println!("  POST /cut-selected");
     println!("  POST /modify-node");
     println!("  POST /upload");
@@ -1191,6 +1292,24 @@ fn filter_dfg(
         .filter(|((from, to), _)| !remove_list.contains(from) && !remove_list.contains(to))
         .map(|(k, v)| (k.clone(), *v))
         .collect()
+}
+
+fn noise_reduction(
+    mut dfg: HashMap<(String, String), usize>,
+    n_threshold: f64,
+) -> HashMap<(String, String), usize> {
+    if n_threshold <= 0.0 {
+        return dfg;
+    }
+
+    let total_value: usize = dfg.values().sum();
+    let cutoff = (total_value as f64 * n_threshold) as usize;
+
+    println!("Noise reduction: Total edges weight = {}, Threshold = {}, Cutoff = {}", total_value, n_threshold, cutoff);
+
+    dfg.retain(|_, &mut weight| weight > cutoff);
+    
+    dfg
 }
 
 fn filter_activities(all_activities: &Vec<String>, remove_list: &Vec<String>) -> HashSet<String> {
@@ -1254,6 +1373,7 @@ fn collect_disjoint_activities(forest: &ProcessForest) -> (bool, HashSet<String>
     let found = find_flower_node(forest, &mut disjoint_activities);
     (found, disjoint_activities)
 }
+
 
 fn mainkoi() {
     println!("Starting example...");
