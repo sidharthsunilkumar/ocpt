@@ -1,5 +1,5 @@
 use std::collections::{HashMap, HashSet};
-// use plotters::prelude::*;
+use plotters::prelude::*;
   
 
 pub fn cost_of_adding_edge(
@@ -233,7 +233,7 @@ pub fn cost_of_adding_edge(
     let mut edge_updates: Vec<((String, String), f64)> = Vec::new(); // Store updates to apply later
     
     // Ensure graphs directory exists
-    // let _ = std::fs::create_dir_all("graphs");
+    let _ = std::fs::create_dir_all("graphs");
 
     for (a, b) in missing_edge_dfg.keys() {
         let empty_vec_f64: Vec<f64> = Vec::new();
@@ -242,6 +242,7 @@ pub fn cost_of_adding_edge(
 
         let a_len = a_timestamps.len();
         let b_len = b_timestamps.len();
+        let mut sum = 0.0;
         let mut area_blue = 0.0;
         let mut area_red = 0.0;
 
@@ -258,8 +259,7 @@ pub fn cost_of_adding_edge(
                 1.06 * std_dev * (data.len() as f64).powf(-0.2) * 4.0
             }
 
-            // Unused since we don't plot anymore
-            // let bw_a = calc_bandwidth(a_timestamps);
+            let bw_a = calc_bandwidth(a_timestamps);
             let bw_b = calc_bandwidth(b_timestamps);
 
             // Define plotting range
@@ -273,6 +273,9 @@ pub fn cost_of_adding_edge(
             let number_of_buckets = 100;
             let step = (end_x - start_x) / number_of_buckets as f64;
             
+            let mut plot_data_a = Vec::new();
+            let mut plot_data_b = Vec::new();
+
             // Helper: Uniform CDF (Linear ramp)
             fn phi(x: f64) -> f64 {
                 if x < -1.0 {
@@ -289,65 +292,84 @@ pub fn cost_of_adding_edge(
                 let r = start_x + (i as f64) * step;
                 let t = start_x + ((i + 1) as f64) * step;
                 
-                // Blue Y: (number of activity b that happens between timestamp r and t)/ total number of activity a occurance
-                // Optimized: Use sorted nature of a_timestamps
-                // partition_point returns the first index where predicate is false
-                // count elements where val >= r and val <= t
-                
-                // First index where val >= r
-                // (val < r) is false -> returns first index where val >= r
-                let start_idx = a_timestamps.partition_point(|&val| val < r);
-                
-                // First index where val > t (so we exclude it)
-                // (val <= t) is false -> returns first index where val > t
-                let end_idx = a_timestamps.partition_point(|&val| val <= t);
-                
-                // Count is end_idx - start_idx
-                // Need to be careful about bounds
-                let count_in_bucket = if end_idx >= start_idx {
-                    end_idx - start_idx
-                } else {
-                    0
-                };
+                // Blue Y: (number of activity b that happens between timestamp r and t)/ total number of activity b occurance
+                // Note: user says "activity b" to refer to the source activity 'a' in this context
+                let count_in_bucket = a_timestamps.iter()
+                    .filter(|&&val| val >= r && val <= t)
+                    .count();
                 
                 let prob_mass_a = if a_len > 0 {
                     count_in_bucket as f64 / a_len as f64
                 } else { 0.0 };
                 
                 // Smoothed P(c happens after x) = 1 - CDF_B(x) evaluated at t
-                // CDF_B(t) = 1/N * sum(phi((t - val) / bw))
-                // phi(z) = 0 if z < -1 (val > t + bw)
-                // phi(z) = 1 if z > 1  (val < t - bw)
-                // phi(z) = linear if -1 <= z <= 1
-                
-                let limit_lower = t - bw_b; // vals < limit_lower have phi=1
-                let limit_upper = t + bw_b; // vals > limit_upper have phi=0
-                
-                // idx_ones: first index where val >= limit_lower. All previous are < limit_lower and contribute 1.
-                let idx_ones = b_timestamps.partition_point(|&val| val < limit_lower);
-                
-                // idx_partial_end: first index where val > limit_upper. All previous up to idx_ones contribute partial.
-                // All >= idx_partial_end contribute 0.
-                let idx_partial_end = b_timestamps.partition_point(|&val| val <= limit_upper);
-                
-                let sum_ones = idx_ones as f64;
-                let mut sum_partial = 0.0;
-                
-                // Sum the linear part
-                if idx_partial_end > idx_ones {
-                    for k in idx_ones..idx_partial_end {
-                        let val = b_timestamps[k];
-                        sum_partial += phi((t - val) / bw_b);
-                    }
+                let mut cdf_b = 0.0;
+                for &val in b_timestamps {
+                    // evaluated at t (the end of the bucket, which is the x-axis point)
+                    cdf_b += phi((t - val) / bw_b);
                 }
-                
-                let cdf_b = (sum_ones + sum_partial) / b_len as f64;
+                cdf_b /= b_len as f64;
                 let prob_b_after = 1.0 - cdf_b;
+                
+                // Contribution to integral (Sum of area under product) - EDITED: Accumulate areas instead
+                // sum += prob_mass_a * prob_b_after;
 
                 area_blue += prob_mass_a * step;
                 area_red += prob_b_after * step;
+                
+                plot_data_a.push((t, prob_mass_a)); // Blue curve points
+                plot_data_b.push((t, prob_b_after)); // Red curve points
             }
-            // Plotting removed for performance
+
+            // Plotting
+            let safe_a = a.chars().map(|c| if c.is_alphanumeric() { c } else { '_' }).collect::<String>();
+            let safe_b = b.chars().map(|c| if c.is_alphanumeric() { c } else { '_' }).collect::<String>();
+            let filename = format!("graphs/{}-{}.png", safe_a, safe_b);
+            
+            // Create backend and drawing area
+            let root = BitMapBackend::new(&filename, (1024, 768)).into_drawing_area();
+            let _ = root.fill(&WHITE);
+            
+            // Using 0..1 as requested for Y axis
+            let chart = ChartBuilder::on(&root)
+                .caption(format!("Missing Edge {} -> {}", a, b), ("sans-serif", 30))
+                .margin(20)
+                .x_label_area_size(40)
+                .y_label_area_size(40)
+                .build_cartesian_2d(start_x..end_x, 0.0..1.0);
+
+            if let Ok(mut chart) = chart {
+                let _ = chart.configure_mesh().draw();
+                
+                // Blue Curve: PDF of Source
+                let _ = chart.draw_series(LineSeries::new(
+                    plot_data_a.clone(),
+                    BLUE.stroke_width(2),
+                ));
+                let _ = chart.draw_series(PointSeries::of_element(
+                    plot_data_a,
+                    5,
+                    &BLUE,
+                    &|c, s, st| {
+                        return EmptyElement::at(c) + Circle::new((0,0),s,st.filled());
+                    },
+                ));
+                
+                // Red Curve: Prob Target Happens After
+                let _ = chart.draw_series(LineSeries::new(
+                    plot_data_b.clone(),
+                    RED.stroke_width(2),
+                ));
+                let _ = chart.draw_series(PointSeries::of_element(
+                    plot_data_b,
+                    5,
+                    &RED,
+                    &|c, s, st| {
+                        return EmptyElement::at(c) + Circle::new((0,0),s,st.filled());
+                    },
+                ));
+            }
+            let _ = root.present();
         }
 
         // Calculate probability using individual activity probabilities
@@ -359,6 +381,7 @@ pub fn cost_of_adding_edge(
 
         println!("Missing edge {} -> {}, score: {:e}", a, b, area_value);
 
+        // Update missing_edge_dfg with the calculated score
 
         edge_updates.push(((a.clone(), b.clone()), area_value));
 
@@ -388,15 +411,6 @@ pub fn cost_of_adding_edge(
             }
         }
     }
-
-    // keep minimum cost as 1.0
-    for cost in missing_edge_dfg.values_mut() {
-        if *cost < 1.0 {
-            *cost = 1.0;
-        }
-    }
-
-
 
     // Print missing edges with their final costs
     println!("\n=== FINAL MISSING EDGE COSTS WITH CURVE FITTING ===");

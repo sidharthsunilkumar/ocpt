@@ -34,6 +34,8 @@ mod best_redo_cuts;
 mod best_sequence_cut;
 mod best_sequence_cut_v2;
 mod cost_to_add;
+mod cost_to_add_curve_fitting;
+mod cost_to_add_curve_fitting1;
 mod cost_to_cut;
 mod good_cuts;
 use crate::cost_to_add::cost_of_adding_edge;
@@ -376,7 +378,8 @@ async fn process_response(file_name_input: String, n_val: Option<f64>) -> Json<V
             disjoint_activities
         );
         // Get costs to add edges
-        let cost_to_add_edges = cost_of_adding_edge(&relations, &div, &filtered_dfg);
+        // let cost_to_add_edges = cost_of_adding_edge(&relations, &div, &filtered_dfg);
+        let cost_to_add_edges = cost_to_add_curve_fitting::cost_of_adding_edge(&relations, &div, &filtered_dfg);
         let json_cost_to_add_edges: Value = format_conversion::cost_to_add_edges_to_json(&cost_to_add_edges);
 
         response.is_perfectly_cut = false;
